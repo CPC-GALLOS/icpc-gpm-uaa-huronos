@@ -56,7 +56,7 @@ echo "installation — you can configure it later in:"
 echo "  HURONOS/data/configs/sync-server.conf"
 echo "============================================="
 echo ""
-read -p "Press Enter to continue to installation..."
+read -r -p "Press Enter to continue to installation..."
 echo ""
 
 # --- Step 5: Run the installer ---

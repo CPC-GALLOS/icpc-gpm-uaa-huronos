@@ -89,7 +89,7 @@ echo ""
 SKIP_INSTALL=false
 if [ -f "$DISK_IMG" ]; then
     echo "Found existing virtual disk image: $DISK_IMG"
-    read -p "Do you want to reinstall to this image? (y/N): " REINSTALL
+    read -r -p "Do you want to reinstall to this image? (y/N): " REINSTALL
     REINSTALL=$(echo "$REINSTALL" | tr '[:upper:]' '[:lower:]')
     if [ "$REINSTALL" != "y" ]; then
         echo "Skipping installation phase. Booting VM..."
@@ -106,7 +106,8 @@ if [ "$SKIP_INSTALL" != "true" ]; then
 
     echo "[Step 3/6] Setting up loop device..."
     sudo systemctl mask udisks2 >/dev/null 2>&1 || true
-    LOOP_DEV=$(sudo losetup --find --show "$DISK_IMG")
+    # Use -P to force partition scanning, so loop0p1, loop0p2, etc are created
+    LOOP_DEV=$(sudo losetup -P --find --show "$DISK_IMG")
     echo "✓ Attached $DISK_IMG to loop device $LOOP_DEV"
     echo ""
 
@@ -115,18 +116,35 @@ if [ "$SKIP_INSTALL" != "true" ]; then
     sudo mount -o loop,ro "$ISO_PATH" "$MOUNT_POINT" 2>/dev/null || echo "(ISO already mounted)"
     echo ""
 
+    echo "[Step 4.5/6] Patching installer for loop device support..."
+    # huronOS install.sh normally rejects non-USB devices. We patch a copy to accept our loop device.
+    cat "$MOUNT_POINT/install.sh" > /tmp/install-patched.sh
+    chmod +x /tmp/install-patched.sh
+    sed -i "s|ISO_DIR=\"\$(dirname \"\$(readlink -f \"\$0\")\")\"|ISO_DIR=\"$MOUNT_POINT\"|" /tmp/install-patched.sh
+    sed -i "s|if \[ \"\$DEV_HOTPLUG\" = \"1\" \] && \[ \"\$DEV_TYPE\" = \"disk\" \]; then|if \[ \"\$DEV_PATH\" = \"$LOOP_DEV\" \]; then|" /tmp/install-patched.sh
+    
+    # Fix partition naming: loop devices use 'loop0p1' instead of 'loop01'
+    # shellcheck disable=SC2016
+    sed -i 's|"${TARGET}1"|"${TARGET}p1"|g' /tmp/install-patched.sh
+    # shellcheck disable=SC2016
+    sed -i 's|"${TARGET}2"|"${TARGET}p2"|g' /tmp/install-patched.sh
+    # shellcheck disable=SC2016
+    sed -i 's|"${TARGET}3"|"${TARGET}p3"|g' /tmp/install-patched.sh
+
     echo "============================================="
     echo " RUNNING huronOS INSTALLER FOR VM"
     echo "============================================="
     echo "⚠️  When asked to select a target disk:"
-    echo "    Select the loop device: $LOOP_DEV"
+    echo "    Select the loop device: $LOOP_DEV (usually option 0)"
     echo "============================================="
     echo ""
-    read -p "Press Enter to start installer..."
+    read -r -p "Press Enter to start installer..."
 
+    # Run the patched script from within the mount point so relative paths work
     cd "$MOUNT_POINT"
-    sudo ./install.sh || true
+    sudo bash /tmp/install-patched.sh || true
     cd - >/dev/null
+    rm -f /tmp/install-patched.sh
 
     echo ""
     echo "[Step 5/6] Flushing disk buffers..."
@@ -152,7 +170,7 @@ sudo virt-install \
   --name "$VM_NAME" \
   --ram 2048 \
   --vcpus 2 \
-  --disk path="$(realpath "$DISK_IMG")",format=raw,bus=sata \
+  --disk path="$(realpath "$DISK_IMG")",format=raw,bus=usb,removable=on \
   --os-variant debian11 \
   --boot hd \
   --network network=default \
