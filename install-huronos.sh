@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/env bash
 # =============================================================================
 # huronOS Installation Script — CPC GALLOS / UAA
 # Configures and installs huronOS onto a USB drive for ICPC contests.
@@ -112,4 +112,3 @@ echo "Judge:   https://boca.icpcmexico.org"
 echo ""
 echo "Check your .hdf directives file for contest-specific times and settings."
 echo ""
-echo "¡Buena suerte! 🏆"

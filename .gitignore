@@ -1,7 +1,11 @@
-# Ignorar la ISO (es muy grande para git, colócala manualmente)
+# Ignore ISO 
 huronOS-alpha-0.4-amd64.iso
 
-# Archivos de sistema
+# Ignore system files
 .DS_Store
 *.swp
 *.swo
+
+# Ignore VM disk images
+*.img
+

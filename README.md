@@ -1,47 +1,48 @@
 # icpc-gpm-uaa-huronos
 
-Configuración e instalación de [huronOS](https://huronos.org) para el equipo de la **Universidad Autónoma de Aguascalientes** en el **Gran Premio de México** (ICPC Region Mexico).
+Installation and configuration of [huronOS](https://huronos.org) for the **Universidad Autónoma de Aguascalientes** teams at the **Gran Premio de México** (ICPC Region Mexico).
 
-- 🏆 **Juez:** [boca.icpcmexico.org](https://boca.icpcmexico.org)
+- 🏆 **Judge:** [boca.icpcmexico.org](https://boca.icpcmexico.org)
 - 💿 **ISO:** huronOS alpha 0.4 amd64
 
 ---
 
-## Contenido del repo
+## Repository contents
 
-```
+```text
 icpc-gpm-uaa-huronos/
-├── install-huronos.sh          # Script de instalación (reutilizable)
-├── *.hdf                       # Archivos de directivas por concurso
-├── .gitignore                  # Ignora la ISO (colócala manualmente)
-├── AGENTS.md                   # Contexto para IA
-└── README.md                   # Este archivo
+├── install-huronos.sh          # Installation script for USB drive
+├── test-huronos-vm.sh          # Automated KVM / virt-manager test script
+├── *.hdf                       # Directives files per contest
+├── .gitignore                  # Ignores the ISO and VM images
+├── AGENTS.md                   # AI context
+└── README.md                   # This file
 ```
 
-### Directivas por concurso
+### Directives per contest
 
-| Archivo | Concurso | Fecha | URL |
-|---------|----------|-------|-----|
-| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – Tercera Fecha | 29 ago 2026, 11:00–16:00 CST | [Gist](https://gist.github.com/ArielParra/60c5cd5c47fa44228b2429bf09dd38e3/raw/ce9ea83e80d36cd469b2c2e741ccbe089ebeaade/icpc-gpm-2026-3rd-date.hdf) |
+| File                                                         | Contest                                | Date                          | URL                                                                                                                                                                |
+| ------------------------------------------------------------ | -------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date  | Aug 29 2026, 11:00–16:00 CST  | [Gist](https://gist.github.com/ArielParra/60c5cd5c47fa44228b2429bf09dd38e3/raw/ce9ea83e80d36cd469b2c2e741ccbe089ebeaade/icpc-gpm-2026-3rd-date.hdf)                |
 
 ---
 
-## Requisitos
+## Requirements
 
-- GNU/Linux (Fedora, Ubuntu, Debian, Arch)
-- USB de **16 GiB o más** (se borrará completamente)
-- La ISO de huronOS alpha 0.4 colocada en la raíz del repo:
+- GNU/Linux (Fedora, Ubuntu, Debian, Arch Linux)
+- USB drive of **16 GiB or more** (it will be completely erased)
+- The huronOS alpha 0.4 ISO **already downloaded** and placed at the root of this repo:
 
-  ```
+  ```text
   huronOS-alpha-0.4-amd64.iso
   ```
 
-  Descárgala desde [mirrors.huronos.org](https://mirrors.huronos.org/huronOS/alpha/huronOS-alpha-0.4-amd64.iso)  
-  y **verifica los checksums** antes de instalar:
+  Download it from [mirrors.huronos.org](https://mirrors.huronos.org/huronOS/alpha/huronOS-alpha-0.4-amd64.iso)  
+  and **verify the checksums** before installing:
 
-  | Hash   | Valor |
-  | ------ | ----- |
-  | MD5    | `9ad2afe4980965c8b6b92fa00b8813d5` |
+  | Hash   | Value                                                              |
+  | ------ | ------------------------------------------------------------------ |
+  | MD5    | `9ad2afe4980965c8b6b92fa00b8813d5`                                 |
   | SHA256 | `b9d530bc7e5b862de9e20c6ce1690ab90f993c6bfa7b44655234708f4e06b2e9` |
 
   ```bash
@@ -49,56 +50,123 @@ icpc-gpm-uaa-huronos/
   sha256sum huronOS-alpha-0.4-amd64.iso
   ```
 
+### Dependencies
+
+Install the required packages for your distro **before** running the installation scripts:
+
+| Distro          | Physical USB Install Command                                                   | KVM / Virtualization Testing Command                                           |
+| --------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Debian / Ubuntu | `sudo apt install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients virt-manager` |
+| Fedora          | `sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo dnf install @virtualization qemu-img virt-install`                        |
+| Arch Linux      | `sudo pacman -S squashfs-tools parted psmisc e2fsprogs dosfstools perl`        | `sudo pacman -S qemu-full virt-manager libvirt`                                |
+
 ---
 
-## Instalación
+## Installation
+
+> ⚠️ **Make sure the ISO is already downloaded** and placed in this directory before running the script.
 
 ```bash
 bash install-huronos.sh
 ```
 
-El script realiza automáticamente:
+The script automatically:
 
-1. Instala dependencias del sistema
-2. Enmascara `udisks2` para evitar interferencia del automontador
-3. Monta la ISO
-4. Ejecuta `install.sh` de huronOS (interactivo — selecciona tu USB)
-5. Ejecuta `sync` dos veces para garantizar escritura completa al disco
-6. Desmonta y limpia
+1. Installs system dependencies
+2. Masks `udisks2` to prevent automounter interference
+3. Mounts the ISO
+4. Runs huronOS's `install.sh` (interactive — select your USB drive)
+5. Runs `sync` twice to guarantee complete write to disk
+6. Unmounts and cleans up
 
-### Valores para el instalador
+### Installer prompts
 
-| Prompt | Valor |
-| ------ | ----- |
-| Root password | *(el que elijas)* |
-| Directives URL | URL raw del `.hdf` del concurso actual (ver tabla arriba) |
-| IP of sync server | *(dejar en blanco)* |
-| IP / Mask / Gateway | *(dejar en blanco — DHCP)* |
-| Target disk | Selecciona tu USB (ej. `/dev/sdb`) |
+| Prompt              | Value                                                   |
+| ------------------- | ------------------------------------------------------- |
+| Root password       | *(choose one)*                                          |
+| Directives URL      | Raw URL of the contest's `.hdf` file (see table above)  |
+| IP of sync server   | *(leave blank)*                                         |
+| IP / Mask / Gateway | *(leave blank — DHCP)*                                  |
+| Target disk         | Select your USB drive (e.g. `/dev/sdb`)                 |
 
-> ⚠️ **El USB se borrará completamente.** Verifica que seleccionas el disco correcto.
+> ⚠️ **The USB drive will be completely erased.** Make sure you select the correct disk.
 
 ---
 
-## Directivas
+## Directives
 
-Cada archivo `.hdf` configura el comportamiento de huronOS para su concurso:
+Each `.hdf` file configures huronOS behavior for its contest:
 
-| Modo | Firewall | USB | Software |
-| ---- | -------- | --- | -------- |
-| **Always** (fuera del concurso) | Todo abierto | Permitido | Todos los lenguajes e IDEs |
-| **Contest** (ventana horaria) | Solo BOCA + ICPC Mexico | Bloqueado | Todos los lenguajes e IDEs |
+| Mode                               | Firewall                | USB     | Software               |
+| ---------------------------------- | ----------------------- | ------- | ---------------------- |
+| **Always** (outside contest hours) | Everything open         | Allowed | All languages and IDEs |
+| **Contest** (time window)          | BOCA + ICPC Mexico only | Blocked | All languages and IDEs |
 
-**Bookmarks en el navegador:** BOCA Contest · ICPC Mexico  
-**Zona horaria:** America/Mexico_City (UTC-6, CST)  
-**Teclado por defecto:** latam
+**Browser bookmarks:** BOCA Contest · ICPC Mexico  
+**Timezone:** America/Mexico_City (UTC-6, CST)  
+**Default keyboard layout:** latam
 
 ---
 
 ## Boot
 
-1. Conecta el USB e inicia el equipo
-2. Entra al menú de boot (F12 / F2 / Del)
-3. **Desactiva Secure Boot** si usas UEFI
-4. Selecciona el USB para arrancar
-5. huronOS arranca automáticamente al escritorio del concursante
+1. Plug in the USB and start the machine
+2. Enter the boot menu (F12 / F2 / Del)
+3. **Disable Secure Boot** if using UEFI
+4. Select the USB to boot from
+5. huronOS automatically boots to the contestant desktop
+
+---
+
+## Testing with KVM / virt-manager
+
+You can test the entire huronOS environment (directives synchronization, contest mode, firewall, software modules, and browser bookmarks) directly inside a Linux virtual machine without needing a physical USB drive.
+
+### Option 1: Automated Script (`test-huronos-vm.sh`)
+
+Run the VM testing script:
+
+```bash
+bash test-huronos-vm.sh
+```
+
+This script will:
+
+1. Check that hardware virtualization (`/dev/kvm`) and libvirt are active.
+2. Create a 16 GiB raw disk image (`huronos-vm-disk.img`).
+3. Attach the image to a loop device (`/dev/loopN`).
+4. Mount the huronOS ISO and run `install.sh` targeting the loop device.
+5. Create and boot a virtual machine (`huronOS-Test-VM`) in KVM via `virt-install`.
+
+### Option 2: Managing via `virt-manager` GUI
+
+Once the VM is created by `test-huronos-vm.sh` or manually:
+
+1. Open **Virtual Machine Manager**:
+
+   ```bash
+   virt-manager
+   ```
+
+2. Select **`huronOS-Test-VM`** and click **Open**.
+3. Observe the SeaBIOS boot screen; huronOS will boot automatically into the desktop within 7 seconds.
+
+#### Physical USB Passthrough in virt-manager
+
+If you have already installed huronOS to a physical USB drive using `install-huronos.sh` and want to test it inside a VM without rebooting your host:
+
+1. Insert your huronOS USB drive into your Linux host.
+2. Open `virt-manager` and create a new Virtual Machine (**Import existing disk image** or blank VM).
+3. Under **Add Hardware** → **USB Host Device**, select your physical USB drive.
+4. Set the boot priority to boot from the USB device (ensure BIOS / Legacy mode is selected, not UEFI OVMF).
+
+### VM Cleanup
+
+To stop and remove the test virtual machine and delete the virtual disk image:
+
+```bash
+sudo virsh destroy huronOS-Test-VM
+sudo virsh undefine huronOS-Test-VM
+rm -f huronos-vm-disk.img
+```
+

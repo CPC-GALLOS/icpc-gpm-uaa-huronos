@@ -180,6 +180,17 @@ Key settings:
 
 ---
 
+## Testing with KVM / virt-manager
+
+huronOS can be tested locally inside KVM without burning a physical USB:
+
+- **Automated setup script:** `test-huronos-vm.sh`
+- **Method:** Creates a 16 GiB raw disk image (`huronos-vm-disk.img`), attaches it as a loop device (`/dev/loopN`), runs `install.sh` from the ISO onto the loop device, and launches `virt-install`.
+- **Boot mode:** SeaBIOS (BIOS/MBR legacy boot) — DO NOT use OVMF/UEFI as huronOS uses extlinux.
+- **Physical USB passthrough:** A physical USB created with `install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager`.
+
+---
+
 ## References
 
 - [huronOS official website](https://huronos.org)
