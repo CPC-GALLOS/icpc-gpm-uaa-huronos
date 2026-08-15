@@ -1,7 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# huronOS Installation Script for ICPC Region Mexico 2026
-# Gran Premio de México 2026 – Tercera Fecha (Aug 29, 11:00–16:00 CST)
+# huronOS Installation Script — CPC GALLOS / UAA
+# Configures and installs huronOS onto a USB drive for ICPC contests.
+# Contest-specific settings are defined in the .hdf directives file.
 # =============================================================================
 # Usage: Run this script in your terminal:
 #   bash install-huronos.sh
@@ -13,7 +14,7 @@ ISO_PATH="/home/ravary/Desktop/website/huronOS-alpha-0.4-amd64.iso"
 MOUNT_POINT="/media/iso"
 
 echo "============================================="
-echo " huronOS Installer — ICPC Region Mexico 2026"
+echo " huronOS Installer — CPC GALLOS / UAA"
 echo "============================================="
 echo ""
 
@@ -107,8 +108,8 @@ echo "  4. Disable Secure Boot if UEFI"
 echo "  5. Boot from USB"
 echo "  6. huronOS auto-boots to contestant desktop"
 echo ""
-echo "Contest: Gran Premio de México 2026 – Tercera Fecha"
-echo "Date:    August 29, 2026  |  11:00 – 16:00 CST"
 echo "Judge:   https://boca.icpcmexico.org"
+echo ""
+echo "Check your .hdf directives file for contest-specific times and settings."
 echo ""
 echo "¡Buena suerte! 🏆"

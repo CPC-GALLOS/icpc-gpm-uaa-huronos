@@ -9,7 +9,7 @@ This file provides context about huronOS and this repository for AI assistants h
 This repo contains the installation script and directives configuration to deploy **huronOS alpha 0.4** for the **ICPC Gran Premio de México 2026 – Tercera Fecha** at **Universidad Autónoma de Aguascalientes**.
 
 - Contest date: August 29, 2026, 11:00–16:00 CST (UTC-6, America/Mexico_City)
-- Judge system: BOCA at https://boca.icpcmexico.org
+- Judge system: BOCA at <https://boca.icpcmexico.org>
 - ISO: `huronOS-alpha-0.4-amd64.iso` (not tracked in git — MD5: `9ad2afe4980965c8b6b92fa00b8813d5`, SHA256: `b9d530bc7e5b862de9e20c6ce1690ab90f993c6bfa7b44655234708f4e06b2e9`)
 
 ---
@@ -30,6 +30,7 @@ huronOS is a Debian-based live Linux distribution specifically designed for **co
 ## Known Bug: extlinux sync issue
 
 The `extlinux` bootloader in huronOS alpha 0.4 has a **critical sync bug** (commit `cb89c2fa`):
+
 - `sync()` was replaced with `syncfs(dir_fd)` but `dir_fd` is closed before `syncfs()` is called
 - `syncfs()` silently fails with `EBADF`
 - Result: bootloader files may stay in RAM cache if USB is unplugged immediately after installation
@@ -77,7 +78,7 @@ WallpaperSha256=<sha256 of wallpaper image>
 ### Available software packages
 
 | ID | Software |
-|----|----------|
+| ---- | ---------- |
 | `internet/chromium` | Chromium browser |
 | `internet/firefox` | Firefox browser |
 | `internet/crow` | Crow Dictionary App |
@@ -118,12 +119,14 @@ WallpaperSha256=<sha256 of wallpaper image>
 | `programming/vsc-intellij-idea-keybindings` | VSCode IntelliJ keybindings |
 
 ### Firewall notes
+
 - `AllowedWebsites=all` allows everything
 - Domain-based: resolves IP at sync time, allows that IP
 - Sites using CDNs / dynamic IPs may need multiple domains whitelisted
 - For BOCA: `boca.icpcmexico.org|score.icpcmexico.org|icpcmexico.org|`
 
 ### Directives hosting options
+
 - **GitHub Gist** (raw URL) — easiest, no infrastructure needed
 - **Public web server** — best for production contests
 - **Local LAN server** — use `http://192.168.x.x/file.hdf` (HTTP recommended, not HTTPS, for local servers)
@@ -133,11 +136,13 @@ WallpaperSha256=<sha256 of wallpaper image>
 ## Installation Process
 
 ### Dependencies (Fedora)
+
 ```bash
 sudo dnf install -y squashfs-tools parted psmisc e2fsprogs dosfstools perl
 ```
 
 ### Steps
+
 1. Mask automounter: `sudo systemctl mask udisks2`
 2. Mount ISO: `sudo mount -o loop,ro huronOS-alpha-0.4-amd64.iso /media/iso`
 3. Run installer: `sudo /media/iso/install.sh`
@@ -148,11 +153,13 @@ sudo dnf install -y squashfs-tools parted psmisc e2fsprogs dosfstools perl
 8. Cleanup: `sudo umount /media/iso && sudo systemctl unmask udisks2`
 
 ### Boot requirements
+
 - Secure Boot must be **disabled** on UEFI systems
 - Windows Fast Startup must be disabled if dual-boot machine
 - huronOS auto-boots to contestant desktop after 7 seconds
 
 ### Post-install directives config (if skipped during install)
+
 Edit on the USB: `HURONOS/data/configs/sync-server.conf`
 
 ---
@@ -163,6 +170,7 @@ Edit on the USB: `HURONOS/data/configs/sync-server.conf`
 **Hosted at:** `https://gist.github.com/ArielParra/60c5cd5c47fa44228b2429bf09dd38e3/raw/ce9ea83e80d36cd469b2c2e741ccbe089ebeaade/icpc-gpm-2026-3rd-date.hdf`
 
 Key settings:
+
 - Contest window: `2026-08-29T11:00:00` → `2026-08-29T16:00:00`
 - Config expires: `2026-08-30T23:59:59`
 - Default keyboard: `latam`
@@ -180,4 +188,3 @@ Key settings:
 - [Directives file syntax](https://huronos.org/docs/usage/directives/directives-file-syntax)
 - [Software modules](https://huronos.org/docs/usage/directives/configurations/software-modules)
 - [Boot options](https://huronos.org/docs/usage/boot-options)
-- [BOCA judge](https://boca.icpcmexico.org)
