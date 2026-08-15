@@ -1,0 +1,33 @@
+[Global]
+TimeZone=America/Mexico_City
+ConfigExpirationTime=2026-08-30T23:59:59
+AvailableKeyboardLayouts=latam|us|es|
+DefaultKeyboardLayout=latam
+EventConfig=false
+ContestConfig=true
+
+[Always]
+AllowedWebsites=all
+AllowUsbStorage=true
+AvailableSoftware=internet/chromium|internet/crow|internet/firefox|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|
+Bookmarks={BOCA Contest^https://boca.icpcmexico.org}|{ICPC Mexico^https://icpcmexico.org}|
+Wallpaper=default
+
+[Event]
+AllowedWebsites=all
+AllowUsbStorage=true
+AvailableSoftware=internet/chromium|langs/g++|langs/gcc|langs/javac|langs/python3|tools/konsole|programming/vscode|
+Bookmarks={BOCA Contest^https://boca.icpcmexico.org}|{ICPC Mexico^https://icpcmexico.org}|
+Wallpaper=default
+
+[Contest]
+AllowedWebsites=boca.icpcmexico.org|score.icpcmexico.org|icpcmexico.org|
+AllowUsbStorage=false
+AvailableSoftware=internet/chromium|internet/crow|internet/firefox|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|
+Bookmarks={BOCA Contest^https://boca.icpcmexico.org}|{ICPC Mexico^https://icpcmexico.org}|
+Wallpaper=default
+
+[Event-Times]
+
+[Contest-Times]
+2026-08-29T11:00:00 2026-08-29T16:00:00

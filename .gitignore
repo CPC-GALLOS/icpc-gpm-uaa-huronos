@@ -1,0 +1,7 @@
+# Ignorar la ISO (es muy grande para git, colócala manualmente)
+huronOS-alpha-0.4-amd64.iso
+
+# Archivos de sistema
+.DS_Store
+*.swp
+*.swo
