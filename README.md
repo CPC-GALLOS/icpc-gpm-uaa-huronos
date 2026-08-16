@@ -182,6 +182,8 @@ Once the VM is created by `test-huronos-vm.sh` or manually:
 2. Select **`huronOS-Test-VM`** and click **Open**.
 3. Observe the SeaBIOS boot screen; huronOS will boot automatically into the desktop within 7 seconds.
 
+> 💡 **Tip:** Since the VM runs without a guest agent, the initial resolution may be squashed. To fix the aspect ratio and preview wallpapers accurately, open **xterm** from the Budgie menu and run `xrandr -s 1920x1080`.
+
 #### Physical USB Passthrough in virt-manager
 
 If you have already installed huronOS to a physical USB drive using `install-huronos.sh` and want to test it inside a VM without rebooting your host:
