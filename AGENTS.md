@@ -191,6 +191,33 @@ huronOS can be tested locally inside KVM without burning a physical USB:
 
 ---
 
+## Custom Wallpaper Integration
+
+- **Working template:** `huronos-wallpaper.png` (1920×1080 PNG).
+- **Injection mechanics:**
+  - `05-custom.hsl`: Layer overlay containing `/usr/share/backgrounds/huronos-background.png` (replaces default fallback system-wide).
+  - `huronOS/data/backups/`: Pre-seeded `{Always,Event,Contest}-mode-wallpaper.*`.
+  - Directives `.hdf`: `Wallpaper=` and `WallpaperSha256=`.
+- **Scripts:**
+  - `update-directives-wallpaper.sh`: Computes SHA256 of `huronos-wallpaper.png` and updates `.hdf`.
+  - `inject-wallpaper.sh`: Injects custom wallpaper into a huronOS USB partition, VM image, or mounted filesystem.
+  - `install-huronos.sh` & `test-huronos-vm.sh`: Both automatically call `inject-wallpaper.sh` after base installation.
+
+---
+
+## Development Guidelines: Shell Script Quality & ShellCheck
+
+> [!IMPORTANT]
+> **Mandatory verification:** Any modified or newly created shell script (`*.sh`) in this repository **must always be verified with `shellcheck`**:
+>
+> ```bash
+> shellcheck install-huronos.sh test-huronos-vm.sh inject-wallpaper.sh update-directives-wallpaper.sh
+> ```
+>
+> All scripts in this repo must pass `shellcheck` with zero errors and zero warnings before committing.
+
+---
+
 ## References
 
 - [huronOS official website](https://huronos.org)

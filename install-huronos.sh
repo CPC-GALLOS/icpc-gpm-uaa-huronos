@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 # =============================================================================
 # huronOS Installation Script — CPC GALLOS / UAA
 # Configures and installs huronOS onto a USB drive for ICPC contests.
@@ -10,28 +10,115 @@
 
 set -e
 
-ISO_PATH="/home/ravary/Desktop/website/huronOS-alpha-0.4-amd64.iso"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+ISO_NAME="huronOS-alpha-0.4-amd64.iso"
+ISO_PATH="$SCRIPT_DIR/${ISO_NAME}"
 MOUNT_POINT="/media/iso"
+WALLPAPER_FILE="$SCRIPT_DIR/wallpaper.png"
+
+# Locate ISO
+if [ ! -f "$ISO_PATH" ]; then
+    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "/home/ravary/Desktop/website" -maxdepth 1 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
+    if [ -n "$ISO_CANDIDATE" ] && [ -f "$ISO_CANDIDATE" ]; then
+        ISO_PATH="$ISO_CANDIDATE"
+    else
+        echo "❌ Error: huronOS ISO not found in $SCRIPT_DIR or ~/Desktop/website/"
+        exit 1
+    fi
+fi
+
+# Locate directives file (generic: CLI arg, auto-discovery, or interactive menu)
+HDF_INPUT="$1"
+HDF_FILE=""
+
+if [ -n "$HDF_INPUT" ] && [ -f "$HDF_INPUT" ]; then
+    HDF_FILE="$(realpath "$HDF_INPUT")"
+else
+    HDF_LIST=()
+    while IFS= read -r -d $'\0' file; do
+        HDF_LIST+=("$file")
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "*.hdf" -print0)
+
+    if [ ${#HDF_LIST[@]} -eq 1 ]; then
+        HDF_FILE="${HDF_LIST[0]}"
+    elif [ ${#HDF_LIST[@]} -gt 1 ]; then
+        echo "Multiple directives files found:"
+        for i in "${!HDF_LIST[@]}"; do
+            echo "  [$((i+1))] $(basename "${HDF_LIST[$i]}")"
+        done
+        read -r -p "Select directives configuration (1-${#HDF_LIST[@]}): " HDF_CHOICE
+        if [[ "$HDF_CHOICE" =~ ^[0-9]+$ ]] && [ "$HDF_CHOICE" -ge 1 ] && [ "$HDF_CHOICE" -le "${#HDF_LIST[@]}" ]; then
+            HDF_FILE="${HDF_LIST[$((HDF_CHOICE-1))]}"
+        else
+            echo "Using default: ${HDF_LIST[0]}"
+            HDF_FILE="${HDF_LIST[0]}"
+        fi
+    fi
+fi
+
+# Custom wallpaper source (optional)
+WALLPAPER_FILE="${2}"
+if [ -z "$WALLPAPER_FILE" ] || [ ! -f "$WALLPAPER_FILE" ]; then
+    if [ -f "$SCRIPT_DIR/huronos-wallpaper.png" ]; then
+        WALLPAPER_FILE="$SCRIPT_DIR/huronos-wallpaper.png"
+    elif [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
+        WALLPAPER_FILE="$SCRIPT_DIR/wallpaper.png"
+    else
+        WALLPAPER_FILE=$(find "$SCRIPT_DIR" -maxdepth 1 \( -name "*wallpaper*.png" -o -name "*wallpaper*.jpg" -o -name "*wallpaper*.jpeg" \) 2>/dev/null | head -n 1 || true)
+    fi
+fi
 
 echo "============================================="
 echo " huronOS Installer — CPC GALLOS / UAA"
 echo "============================================="
+echo "ISO Image:        $ISO_PATH"
+if [ -n "$HDF_FILE" ]; then
+    echo "Directives File:  $HDF_FILE ($(basename "$HDF_FILE"))"
+else
+    echo "Directives File:  None selected (will prompt during install)"
+fi
+if [ -f "$WALLPAPER_FILE" ]; then
+    echo "Custom Wallpaper: $WALLPAPER_FILE ($(sha256sum "$WALLPAPER_FILE" | awk '{print $1}'))"
+fi
 echo ""
 
-# --- Step 1: Install dependencies ---
-echo "[Step 1/7] Installing dependencies..."
-sudo dnf install -y squashfs-tools parted psmisc e2fsprogs dosfstools perl
-echo "✓ Dependencies installed."
+# --- Step 1: Check & install dependencies ---
+echo "[Step 1/8] Checking dependencies..."
+MISSING_TOOLS=()
+for cmd in mksquashfs unsquashfs parted fuser mkfs.vfat mkfs.ext4 perl wipefs; do
+    if ! command -v "$cmd" &>/dev/null; then
+        MISSING_TOOLS+=("$cmd")
+    fi
+done
+
+if [ ${#MISSING_TOOLS[@]} -ne 0 ]; then
+    echo "⚠️ Missing tools: ${MISSING_TOOLS[*]}"
+    echo "Installing dependencies..."
+    if command -v dnf &>/dev/null; then
+        sudo dnf install -y squashfs-tools parted psmisc e2fsprogs dosfstools perl
+    elif command -v apt &>/dev/null; then
+        sudo apt update && sudo apt install -y squashfs-tools parted psmisc e2fsprogs dosfstools perl-base
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -S --needed squashfs-tools parted psmisc e2fsprogs dosfstools perl
+    else
+        echo "❌ Error: Could not detect package manager (dnf/apt/pacman)."
+        echo "   Please install the following tools manually: ${MISSING_TOOLS[*]}"
+        exit 1
+    fi
+    echo "✓ Dependencies installed."
+else
+    echo "✓ All required dependencies are already installed."
+fi
 echo ""
 
 # --- Step 2: Mask automounter ---
-echo "[Step 2/7] Masking udisks2 automounter..."
+echo "[Step 2/8] Masking udisks2 automounter..."
 sudo systemctl mask udisks2
 echo "✓ udisks2 masked (automount disabled)."
 echo ""
 
 # --- Step 3: Mount the ISO ---
-echo "[Step 3/7] Mounting ISO..."
+echo "[Step 3/8] Mounting ISO..."
 sudo mkdir -p "$MOUNT_POINT"
 sudo mount -o loop,ro "$ISO_PATH" "$MOUNT_POINT" 2>/dev/null || echo "(ISO already mounted, continuing...)"
 echo ""
@@ -43,13 +130,14 @@ echo ""
 
 # --- Step 4: Directives reminder ---
 echo "============================================="
-echo " DIRECTIVES FILE REMINDER"
+echo " DIRECTIVES & WALLPAPER CONFIGURATION"
 echo "============================================="
 echo "Your directives file is at:"
-echo "  /home/ravary/Desktop/website/icpc-gpm-2026-3rd-date.hdf"
+echo "  $HDF_FILE"
 echo ""
-echo "You need to host it somewhere accessible via HTTP/HTTPS."
-echo "Quickest: Use a GitHub Gist or Raw GitHub URL, and copy the Raw URL."
+echo "You can host it via GitHub Gist or Raw GitHub URL."
+echo "If you edit '$WALLPAPER_FILE', you can run './update-directives-wallpaper.sh'"
+echo "to calculate the SHA256 and update your directives file automatically."
 echo ""
 echo "If you don't have a URL yet, leave the directives URL blank during"
 echo "installation — you can configure it later in:"
@@ -60,19 +148,30 @@ read -r -p "Press Enter to continue to installation..."
 echo ""
 
 # --- Step 5: Run the installer ---
-echo "[Step 5/7] Running huronOS installer..."
+echo "[Step 5/8] Running huronOS installer..."
 echo ""
 echo "⚠  WARNING: The installer will ask you to select a target disk."
-echo "⚠  Your USB is /dev/sdb (58GB). ALL DATA WILL BE ERASED."
-echo "⚠  Double-check before confirming!"
+echo "⚠  Double-check your USB device before confirming! ALL DATA WILL BE ERASED."
 echo ""
 cd "$MOUNT_POINT"
 sudo ./install.sh
+cd "$SCRIPT_DIR"
 echo ""
-echo "✓ Installer finished."
+echo "✓ Base installer finished."
 echo ""
 
-# --- Step 6: CRITICAL — Manual sync ---
+# --- Step 6: Inject custom wallpaper ---
+if [ -f "$WALLPAPER_FILE" ]; then
+    echo "[Step 6/8] Injecting custom wallpaper into USB..."
+    sudo bash "$SCRIPT_DIR/inject-wallpaper.sh" "" "$WALLPAPER_FILE" || {
+        echo "⚠️ Warning: Custom wallpaper injection encountered an issue, continuing..."
+    }
+else
+    echo "[Step 6/8] No custom wallpaper.png found, skipping injection."
+fi
+echo ""
+
+# --- Step 7: CRITICAL — Manual sync ---
 echo "============================================="
 echo " ⚠  CRITICAL: Syncing disk buffers..."
 echo " Due to a known extlinux bug, we MUST sync"
@@ -87,8 +186,8 @@ sleep 5
 echo "✓ Disk buffers flushed. Safe to unplug in a moment."
 echo ""
 
-# --- Step 7: Cleanup ---
-echo "[Step 7/7] Cleaning up..."
+# --- Step 8: Cleanup ---
+echo "[Step 8/8] Cleaning up..."
 cd /
 sudo umount "$MOUNT_POINT" 2>/dev/null || true
 sudo systemctl unmask udisks2

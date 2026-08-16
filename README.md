@@ -11,12 +11,15 @@ Installation and configuration of [huronOS](https://huronos.org) for the **Unive
 
 ```text
 icpc-gpm-uaa-huronos/
-├── install-huronos.sh          # Installation script for USB drive
-├── test-huronos-vm.sh          # Automated KVM / virt-manager test script
-├── *.hdf                       # Directives files per contest
-├── .gitignore                  # Ignores the ISO and VM images
-├── AGENTS.md                   # AI context
-└── README.md                   # This file
+├── install-huronos.sh              # Installation script for USB drive (with custom wallpaper)
+├── test-huronos-vm.sh              # Automated KVM / virt-manager test script
+├── inject-wallpaper.sh             # Injects wallpaper into 05-custom.hsl & USB/VM partitions
+├── update-directives-wallpaper.sh  # Calculates SHA256 of custom wallpaper & updates .hdf
+├── huronos-wallpaper.png           # Custom contest wallpaper (1920×1080 PNG)
+├── *.hdf                           # Directives files per contest
+├── .gitignore                      # Ignores the ISO and VM images
+├── AGENTS.md                       # AI context
+└── README.md                       # This file
 ```
 
 ### Directives per contest
@@ -57,7 +60,7 @@ Install the required packages for your distro **before** running the installatio
 | Distro          | Physical USB Install Command                                                   | KVM / Virtualization Testing Command                                           |
 | --------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | Debian / Ubuntu | `sudo apt install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients virt-manager` |
-| Fedora          | `sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo dnf install @virtualization qemu-img virt-install`                       |
+| Fedora          | `sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl`      | `sudo dnf install @virtualization qemu-img virt-install`                       |
 | Arch Linux      | `sudo pacman -S squashfs-tools parted psmisc e2fsprogs dosfstools perl`        | `sudo pacman -S qemu-full virt-manager libvirt`                                |
 
 ---
@@ -67,17 +70,22 @@ Install the required packages for your distro **before** running the installatio
 > ⚠️ **Make sure the ISO is already downloaded** and placed in this directory before running the script.
 
 ```bash
+# Auto-detects directives file and wallpaper:
 bash install-huronos.sh
+
+# Or specify custom directives file and wallpaper explicitly:
+bash install-huronos.sh contest-config.hdf my-wallpaper.png
 ```
 
 The script automatically:
 
-1. Installs system dependencies
-2. Masks `udisks2` to prevent automounter interference
-3. Mounts the ISO
-4. Runs huronOS's `install.sh` (interactive — select your USB drive)
-5. Runs `sync` twice to guarantee complete write to disk
-6. Unmounts and cleans up
+1. Auto-discovers ISO and directives files (presents an interactive menu if multiple `.hdf` files exist)
+2. Installs system dependencies
+3. Masks `udisks2` to prevent automounter interference
+4. Mounts the ISO and runs huronOS `install.sh`
+5. Automatically injects custom wallpaper into `05-custom.hsl` and `huronOS/data/backups/`
+6. Runs `sync` twice to flush disk buffers safely
+7. Unmounts and cleans up
 
 ### Installer prompts
 
@@ -93,18 +101,41 @@ The script automatically:
 
 ---
 
-## Directives
+## Custom Wallpaper
 
-Each `.hdf` file configures huronOS behavior for its contest:
+huronOS allows customizing the desktop background for contestants:
 
-| Mode                               | Firewall                | USB     | Software               |
-| ---------------------------------- | ----------------------- | ------- | ---------------------- |
-| **Always** (outside contest hours) | Everything open         | Allowed | All languages and IDEs |
-| **Contest** (time window)          | BOCA + ICPC Mexico only | Blocked | All languages and IDEs |
+- **Format:** PNG (recommended) or JPEG
+- **Resolution:** `1920×1080`
+- **Current wallpaper:** [`huronos-wallpaper.png`](./huronos-wallpaper.png)
 
-**Browser bookmarks:** BOCA Contest · ICPC Mexico  
-**Timezone:** America/Mexico_City (UTC-6, CST)  
-**Default keyboard layout:** latam
+### 1. Editing & Updating
+
+1. Open and edit [`huronos-wallpaper.png`](./huronos-wallpaper.png) with your preferred graphics software (GIMP, Canva, Figma, Photoshop, etc.).
+2. Whenever you modify your wallpaper (or create new `.hdf` configs), run:
+
+```bash
+# Automatically computes SHA256 and updates ALL *.hdf files in repo:
+./update-directives-wallpaper.sh
+
+# Or update with a specific wallpaper / directives file:
+./update-directives-wallpaper.sh my-wallpaper.png contest-2027.hdf
+```
+
+### 2. Injecting into USB / Virtual Machine
+
+- **Automatic during USB install:** `bash install-huronos.sh [config.hdf]` automatically detects `wallpaper.png` and injects it into `05-custom.hsl` and `huronOS/data/backups/`.
+- **Automatic during VM test:** `bash test-huronos-vm.sh [my-wallpaper.png]` automatically injects the wallpaper into the virtual disk.
+- **Manual injection at any time:**
+
+```bash
+# Auto-detects partition labeled HURONOS:
+sudo ./inject-wallpaper.sh
+
+# Or specify partition or mount directory and image:
+sudo ./inject-wallpaper.sh /dev/sdX1 custom-wallpaper.png
+sudo ./inject-wallpaper.sh /media/user/HURONOS custom-wallpaper.png
+```
 
 ---
 

@@ -11,7 +11,9 @@ AllowedWebsites=all
 AllowUsbStorage=true
 AvailableSoftware=internet/chromium|internet/crow|internet/firefox|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|
 Bookmarks={BOCA Contest^https://boca.icpcmexico.org}|{ICPC Mexico^https://icpcmexico.org}|
+# Set to 'default' to use the custom wallpaper baked into the USB, or specify a remote URL:
 Wallpaper=default
+WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 
 [Event]
 AllowedWebsites=all
@@ -19,6 +21,7 @@ AllowUsbStorage=true
 AvailableSoftware=internet/chromium|langs/g++|langs/gcc|langs/javac|langs/python3|tools/konsole|programming/vscode|
 Bookmarks={BOCA Contest^https://boca.icpcmexico.org}|{ICPC Mexico^https://icpcmexico.org}|
 Wallpaper=default
+WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 
 [Contest]
 AllowedWebsites=boca.icpcmexico.org|score.icpcmexico.org|icpcmexico.org|
@@ -26,8 +29,10 @@ AllowUsbStorage=false
 AvailableSoftware=internet/chromium|internet/crow|internet/firefox|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|
 Bookmarks={BOCA Contest^https://boca.icpcmexico.org}|{ICPC Mexico^https://icpcmexico.org}|
 Wallpaper=default
+WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 
 [Event-Times]
 
 [Contest-Times]
 2026-08-29T11:00:00 2026-08-29T16:00:00
+

@@ -146,6 +146,27 @@ if [ "$SKIP_INSTALL" != "true" ]; then
     cd - >/dev/null
     rm -f /tmp/install-patched.sh
 
+    # Inject custom wallpaper if present
+    SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+    VM_WALLPAPER="${1}"
+    if [ -z "$VM_WALLPAPER" ] || [ ! -f "$VM_WALLPAPER" ]; then
+        if [ -f "$SCRIPT_DIR/huronos-wallpaper.png" ]; then
+            VM_WALLPAPER="$SCRIPT_DIR/huronos-wallpaper.png"
+        elif [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
+            VM_WALLPAPER="$SCRIPT_DIR/wallpaper.png"
+        else
+            VM_WALLPAPER=$(find "$SCRIPT_DIR" -maxdepth 1 \( -name "*wallpaper*.png" -o -name "*wallpaper*.jpg" -o -name "*wallpaper*.jpeg" \) 2>/dev/null | head -n 1 || true)
+        fi
+    fi
+
+    if [ -f "$VM_WALLPAPER" ]; then
+        echo ""
+        echo "[Step 4.8/6] Injecting custom wallpaper ($VM_WALLPAPER) into VM disk image..."
+        sudo bash "$SCRIPT_DIR/inject-wallpaper.sh" "${LOOP_DEV}p1" "$VM_WALLPAPER" || {
+            echo "⚠️ Warning: Custom wallpaper injection encountered an issue, continuing..."
+        }
+    fi
+
     echo ""
     echo "[Step 5/6] Flushing disk buffers..."
     sync && sleep 3 && sync
