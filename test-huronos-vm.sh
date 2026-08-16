@@ -195,7 +195,8 @@ sudo virt-install \
   --os-variant debian11 \
   --boot hd \
   --network network=default \
-  --graphics vnc,listen=127.0.0.1 \
+  --graphics spice,listen=127.0.0.1 \
+  --video qxl \
   --noautoconsole || {
     echo "virt-install completed."
 }
