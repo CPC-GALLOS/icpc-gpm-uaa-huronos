@@ -127,7 +127,7 @@ WallpaperSha256=<sha256 of wallpaper image>
 
 ### Directives hosting options
 
-- **GitHub Gist** (raw URL) — easiest, no infrastructure needed
+- **GitHub Gist or Raw GitHub** (raw URL) — easiest, no infrastructure needed
 - **Public web server** — best for production contests
 - **Local LAN server** — use `http://192.168.x.x/file.hdf` (HTTP recommended, not HTTPS, for local servers)
 
@@ -167,7 +167,7 @@ Edit on the USB: `HURONOS/data/configs/sync-server.conf`
 ## This repo's directives file
 
 **File:** `icpc-gpm-2026-3rd-date.hdf`  
-**Hosted at:** `https://gist.github.com/ArielParra/60c5cd5c47fa44228b2429bf09dd38e3/raw/ce9ea83e80d36cd469b2c2e741ccbe089ebeaade/icpc-gpm-2026-3rd-date.hdf`
+**Hosted at:** `https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf` (Raw GitHub) or Gist raw URL
 
 Key settings:
 

@@ -23,7 +23,7 @@ icpc-gpm-uaa-huronos/
 
 | File                                                         | Contest                                | Date                          | URL                                                                                                                                                                |
 | ------------------------------------------------------------ | -------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date  | Aug 29 2026, 11:00–16:00 CST  | [Gist](https://gist.github.com/ArielParra/60c5cd5c47fa44228b2429bf09dd38e3/raw/ce9ea83e80d36cd469b2c2e741ccbe089ebeaade/icpc-gpm-2026-3rd-date.hdf)                |
+| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date  | Aug 29 2026, 11:00–16:00 CST  | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf)                                                    |
 
 ---
 
@@ -57,7 +57,7 @@ Install the required packages for your distro **before** running the installatio
 | Distro          | Physical USB Install Command                                                   | KVM / Virtualization Testing Command                                           |
 | --------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | Debian / Ubuntu | `sudo apt install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients virt-manager` |
-| Fedora          | `sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo dnf install @virtualization qemu-img virt-install`                        |
+| Fedora          | `sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo dnf install @virtualization qemu-img virt-install`                       |
 | Arch Linux      | `sudo pacman -S squashfs-tools parted psmisc e2fsprogs dosfstools perl`        | `sudo pacman -S qemu-full virt-manager libvirt`                                |
 
 ---
@@ -169,4 +169,3 @@ sudo virsh destroy huronOS-Test-VM
 sudo virsh undefine huronOS-Test-VM
 rm -f huronos-vm-disk.img
 ```
-
