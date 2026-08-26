@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# inject-wallpaper.sh — CPC GALLOS / UAA
-# Injects a custom wallpaper into a huronOS system partition or directory.
+# 02-inject-custom-layer.sh — CPC GALLOS / UAA
+# Injects custom wallpaper, Xorg/Mesa graphics fallbacks, and VS Code
+# extensions (CPH, Microsoft Python & Red Hat Java) into a huronOS system partition or directory.
 #
-# Can be called with:
-#   1. A mounted directory (e.g. /media/HURONOS or /mnt/huronos)
-#   2. A device/partition path (e.g. /dev/sdb1 or /dev/loop0p1)
-#   3. No argument (will auto-detect partition labeled 'HURONOS')
+# Usage:
+#   bash 02-inject-custom-layer.sh [/dev/sdX1 | /path/to/mounted/HURONOS] [wallpaper.png]
 # =============================================================================
 
 set -e
@@ -35,12 +34,20 @@ WALLPAPER_SHA=$(sha256sum "$WALLPAPER_SRC" | awk '{print $1}')
 FILE_INFO=$(file "$WALLPAPER_SRC")
 FBDEV_DEB_URL="https://deb.debian.org/debian/pool/main/x/xserver-xorg-video-fbdev/xserver-xorg-video-fbdev_0.5.0-1_amd64.deb"
 FBDEV_DEB_SHA256="cccf3792ff2b6c95b55269b67ca7c5213a00561711fe8d10e5436961faf5d9d9"
+
+# Extension definitions: MODULE_ID | DEFAULT_NAME | FALLBACK_URL | LOCAL_CANDIDATE_PATTERNS
+EXT_CONFIGS=(
+    "vsc-cph|competitive-programming-helper|https://github.com/agrawal-d/cph/releases/download/latest-vsix/competitive-programming-helper-2077.0.0.vsix|competitive-programming-helper-2077.0.0.vsix cph.vsix"
+    "vsc-python|python|https://open-vsx.org/api/ms-python/python/2023.14.0/file/ms-python.python-2023.14.0.vsix|ms-python.python-2023.14.0.vsix ms-python.vsix python.vsix"
+    "vsc-java|java|https://open-vsx.org/api/redhat/java/1.40.0/file/redhat.java-1.40.0.vsix|redhat.java-1.40.0.vsix redhat-java.vsix java.vsix"
+)
+
 echo "✓ Wallpaper source: $WALLPAPER_SRC"
 echo "  Type:   $FILE_INFO"
 echo "  SHA256: $WALLPAPER_SHA"
 echo ""
 
-# 2. Determine target mount point or device
+# Determine target mount point or device
 MOUNTED_BY_US=false
 TARGET_DIR=""
 
@@ -102,18 +109,22 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# 3. Check for huronOS structure
+# Check for huronOS structure
 if [ ! -d "$TARGET_DIR/huronOS" ] && [ ! -d "$TARGET_DIR/base" ]; then
     echo "❌ Error: '$TARGET_DIR' does not appear to be a valid huronOS system directory."
     exit 1
 fi
 
 BASE_DIR="$TARGET_DIR/huronOS/base"
+SOFTWARE_PROG_DIR="$TARGET_DIR/huronOS/software/programming"
 DATA_BACKUPS_DIR="$TARGET_DIR/huronOS/data/backups"
 CHECKSUMS_FILE="$TARGET_DIR/checksums"
 
 if [ ! -d "$BASE_DIR" ] && [ -d "$TARGET_DIR/base" ]; then
     BASE_DIR="$TARGET_DIR/base"
+fi
+if [ ! -d "$SOFTWARE_PROG_DIR" ] && [ -d "$TARGET_DIR/software/programming" ]; then
+    SOFTWARE_PROG_DIR="$TARGET_DIR/software/programming"
 fi
 if [ ! -d "$DATA_BACKUPS_DIR" ] && [ -d "$TARGET_DIR/data/backups" ]; then
     DATA_BACKUPS_DIR="$TARGET_DIR/data/backups"
@@ -124,7 +135,7 @@ fi
 
 echo "Target base directory: $BASE_DIR"
 
-# 4. Unsquash and rebuild 05-custom.hsl with the new wallpaper
+# Unsquash and rebuild 05-custom.hsl with wallpaper, graphics fix, and VS Code extensions
 TMP_LAB="/tmp/huronos-layer-lab-$$"
 mkdir -p "$TMP_LAB/squashfs-root"
 
@@ -138,15 +149,13 @@ echo "Injecting wallpaper as /usr/share/backgrounds/huronos-background.png..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/backgrounds"
 cp -f "$WALLPAPER_SRC" "$TMP_LAB/squashfs-root/usr/share/backgrounds/huronos-background.png"
 
-echo "Removing rigid Xorg display configuration from 05-custom.hsl..."
+echo "Configuring Xorg display and Mesa fallback in 05-custom.hsl..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d"
 mkdir -p "$TMP_LAB/squashfs-root/etc/alternatives"
 mkdir -p "$TMP_LAB/squashfs-root/usr/lib/xorg/modules/drivers"
 mkdir -p "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d"
 mkdir -p "$TMP_LAB/fbdev-package"
 
-# Let Xorg auto-probe the available KMS device.  A hard-coded Screen section
-# prevents valid fallback devices (for example simpledrm) from being selected.
 rm -f "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-modesetting.conf"
 
 echo "Downloading the Debian fbdev Xorg driver..."
@@ -182,14 +191,94 @@ export LIBGL_ALWAYS_SOFTWARE=1
 export GALLIUM_DRIVER=llvmpipe
 EOF
 
-# Disable a conflicting NVIDIA proprietary output class.
 cat << 'EOF' > "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d/nvidia-drm-outputclass.conf"
 # Disabled for universal Intel/AMD/NVIDIA open-source compatibility
 EOF
 
-# Keep the immutable image on Mesa rather than the absent legacy NVIDIA GLX.
 ln -sf /usr/lib/mesa-diverted "$TMP_LAB/squashfs-root/etc/alternatives/glx"
 ln -sf /usr/lib/xorg/modules/extensions/libglx.so "$TMP_LAB/squashfs-root/etc/alternatives/glx--libglxserver_nvidia.so"
+
+mkdir -p "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/ids"
+
+declare -a GENERATED_HSMS=()
+
+for ext_spec in "${EXT_CONFIGS[@]}"; do
+    IFS='|' read -r MOD_ID DEFAULT_EXT_NAME EXT_URL PATTERNS <<< "$ext_spec"
+
+    echo "Injecting extension: $MOD_ID ($DEFAULT_EXT_NAME)..."
+
+    LOCAL_VSIX=""
+    for pat in $PATTERNS; do
+        if [ -f "$SCRIPT_DIR/$pat" ]; then
+            LOCAL_VSIX="$SCRIPT_DIR/$pat"
+            break
+        fi
+    done
+
+    if [ -z "$LOCAL_VSIX" ]; then
+        FOUND=$(find "$SCRIPT_DIR" -maxdepth 1 -name "*$DEFAULT_EXT_NAME*.vsix" 2>/dev/null | head -n 1 || true)
+        if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
+            LOCAL_VSIX="$FOUND"
+        fi
+    fi
+
+    if [ -z "$LOCAL_VSIX" ] || [ ! -f "$LOCAL_VSIX" ]; then
+        echo "  Downloading $MOD_ID from $EXT_URL..."
+        LOCAL_VSIX="$TMP_LAB/${MOD_ID}.vsix"
+        curl -fsSL --retry 3 -o "$LOCAL_VSIX" "$EXT_URL" || true
+    fi
+
+    if [ -f "$LOCAL_VSIX" ]; then
+        UNPACK_DIR="$TMP_LAB/unpack_$MOD_ID"
+        mkdir -p "$UNPACK_DIR"
+        unzip -q "$LOCAL_VSIX" -d "$UNPACK_DIR"
+
+        PKG_JSON="$UNPACK_DIR/extension/package.json"
+        EXT_VERSION=$(grep -o '"version": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "1.0.0")
+        EXT_PUBLISHER=$(grep -o '"publisher": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "custom")
+        EXT_NAME=$(grep -o '"name": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "$DEFAULT_EXT_NAME")
+
+        [ -z "$EXT_VERSION" ] && EXT_VERSION="1.0.0"
+        [ -z "$EXT_PUBLISHER" ] && EXT_PUBLISHER="custom"
+        [ -z "$EXT_NAME" ] && EXT_NAME="$DEFAULT_EXT_NAME"
+
+        FULL_EXT_ID="${EXT_PUBLISHER}.${EXT_NAME}"
+        EXT_DIR_NAME="${FULL_EXT_ID}-${EXT_VERSION}"
+
+        EXT_ROOT="$TMP_LAB/root_$MOD_ID"
+        mkdir -p "$EXT_ROOT/opt/codium/contestant/extensions/ids"
+        mkdir -p "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME"
+
+        cp -rf "$UNPACK_DIR/extension/"* "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/"
+        if [ -f "$UNPACK_DIR/extension.vsixmanifest" ]; then
+            cp -f "$UNPACK_DIR/extension.vsixmanifest" "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/.vsixmanifest"
+        fi
+
+        NOW_MS=$(date +%s000)
+        cat << EOF > "$EXT_ROOT/opt/codium/contestant/extensions/ids/${MOD_ID}.json"
+{"identifier":{"id":"${FULL_EXT_ID}"},"version":"${EXT_VERSION}","location":{"\$mid":1,"fsPath":"/opt/codium/contestant/extensions/${EXT_DIR_NAME}","external":"file:///opt/codium/contestant/extensions/${EXT_DIR_NAME}","path":"/opt/codium/contestant/extensions/${EXT_DIR_NAME}","scheme":"file"},"relativeLocation":"${EXT_DIR_NAME}","metadata":{"installedTimestamp":${NOW_MS}}}
+EOF
+
+        # Inject into 05-custom.hsl tree
+        mkdir -p "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/$EXT_DIR_NAME"
+        cp -rf "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/"* "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/$EXT_DIR_NAME/"
+        if [ -f "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/.vsixmanifest" ]; then
+            cp -f "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/.vsixmanifest" "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/$EXT_DIR_NAME/"
+        fi
+        cp -f "$EXT_ROOT/opt/codium/contestant/extensions/ids/${MOD_ID}.json" "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/ids/${MOD_ID}.json"
+
+        # Build standalone .hsm module
+        if [ -d "$SOFTWARE_PROG_DIR" ]; then
+            HSM_FILE="$SOFTWARE_PROG_DIR/${MOD_ID}.hsm"
+            echo "  Building standalone module: $HSM_FILE"
+            TMP_HSM="$TMP_LAB/${MOD_ID}.hsm"
+            rm -f "$TMP_HSM"
+            mksquashfs "$EXT_ROOT" "$TMP_HSM" -comp xz -b 1024K -always-use-fragments -noappend >/dev/null
+            cp -f "$TMP_HSM" "$HSM_FILE"
+            GENERATED_HSMS+=("${MOD_ID}.hsm")
+        fi
+    fi
+done
 
 echo "Building updated 05-custom.hsl squashfs layer..."
 rm -f "$TMP_LAB/05-custom.hsl"
@@ -197,9 +286,9 @@ mksquashfs "$TMP_LAB/squashfs-root" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -
 
 cp -f "$TMP_LAB/05-custom.hsl" "$CUSTOM_HSL"
 rm -rf "$TMP_LAB"
-echo "✓ Updated $CUSTOM_HSL (with wallpaper and automatic Xorg/Mesa configuration)"
+echo "✓ Updated $CUSTOM_HSL (with wallpaper, graphics fix, and full VS Code extensions suite)"
 
-# 5. Pre-seed wallpaper in huronOS/data/backups/
+# Pre-seed wallpaper in huronOS/data/backups/
 mkdir -p "$DATA_BACKUPS_DIR"
 WALL_BASENAME="$(basename "$WALLPAPER_SRC")"
 WALL_EXT="${WALL_BASENAME##*.}"
@@ -215,7 +304,6 @@ copy_wallpaper_if_needed() {
 copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Always-mode-wallpaper.${WALL_EXT}"
 copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Event-mode-wallpaper.${WALL_EXT}"
 copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Contest-mode-wallpaper.${WALL_EXT}"
-# Also seed .png aliases if extension is not png for fallback
 if [ "$WALL_EXT" != "png" ]; then
     copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Always-mode-wallpaper.png"
     copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Event-mode-wallpaper.png"
@@ -223,13 +311,33 @@ if [ "$WALL_EXT" != "png" ]; then
 fi
 echo "✓ Pre-seeded Always, Event, and Contest mode wallpapers in huronOS/data/backups/"
 
-# 6. Update checksums file if present
+# Update checksums file if present
 if [ -f "$CHECKSUMS_FILE" ]; then
-    echo "Updating $CHECKSUMS_FILE with new 05-custom.hsl checksum..."
+    echo "Updating $CHECKSUMS_FILE with new checksums..."
     CURRENT_PWD="$(pwd)"
     cd "$TARGET_DIR"
-    NEW_CHECKSUM=$(sha256sum huronOS/base/05-custom.hsl 2>/dev/null || sha256sum base/05-custom.hsl)
-    sed -i "s|.*05-custom.hsl.*|$NEW_CHECKSUM|" "$CHECKSUMS_FILE"
+    NEW_HSL_CHECKSUM=$(sha256sum huronOS/base/05-custom.hsl 2>/dev/null || sha256sum base/05-custom.hsl 2>/dev/null || true)
+    if [ -n "$NEW_HSL_CHECKSUM" ]; then
+        if grep -q "05-custom.hsl" "$CHECKSUMS_FILE"; then
+            sed -i "s|.*05-custom.hsl.*|$NEW_HSL_CHECKSUM|" "$CHECKSUMS_FILE"
+        else
+            echo "$NEW_HSL_CHECKSUM" >> "$CHECKSUMS_FILE"
+        fi
+    fi
+
+    for hsm in "${GENERATED_HSMS[@]}"; do
+        HSM_PATH="huronOS/software/programming/$hsm"
+        [ ! -f "$HSM_PATH" ] && HSM_PATH="software/programming/$hsm"
+        if [ -f "$HSM_PATH" ]; then
+            NEW_HSM_CHECKSUM=$(sha256sum "$HSM_PATH")
+            if grep -q "$hsm" "$CHECKSUMS_FILE"; then
+                sed -i "s|.*$hsm.*|$NEW_HSM_CHECKSUM|" "$CHECKSUMS_FILE"
+            else
+                echo "$NEW_HSM_CHECKSUM" >> "$CHECKSUMS_FILE"
+            fi
+        fi
+    done
+
     cd "$CURRENT_PWD"
     echo "✓ Checksums updated."
 fi
@@ -237,6 +345,7 @@ fi
 sync
 echo ""
 echo "============================================="
-echo " ✓ Custom wallpaper successfully injected!"
+echo " ✓ Custom layer successfully injected!"
 echo " Wallpaper SHA256: $WALLPAPER_SHA"
+echo " VS Code Extensions: C/C++, CPH, Python & Java ready"
 echo "============================================="

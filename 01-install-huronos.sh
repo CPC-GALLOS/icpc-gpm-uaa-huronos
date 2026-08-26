@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# huronOS Installation Script — CPC GALLOS / UAA
+# 01-install-huronos.sh — CPC GALLOS / UAA
 # Configures and installs huronOS onto a USB drive for ICPC contests.
 # Contest-specific settings are defined in the .hdf directives file.
 # =============================================================================
 # Usage: Run this script in your terminal:
-#   bash install-huronos.sh
+#   bash 01-install-huronos.sh
 # =============================================================================
 
 set -e
@@ -136,7 +136,7 @@ echo "Your directives file is at:"
 echo "  $HDF_FILE"
 echo ""
 echo "You can host it via GitHub Gist or Raw GitHub URL."
-echo "If you edit '$WALLPAPER_FILE', you can run './update-directives-wallpaper.sh'"
+echo "If you edit '$WALLPAPER_FILE', you can run './04-update-directives-wallpaper.sh'"
 echo "to calculate the SHA256 and update your directives file automatically."
 echo ""
 echo "If you don't have a URL yet, leave the directives URL blank during"
@@ -160,20 +160,16 @@ echo ""
 echo "✓ Base installer finished."
 echo ""
 
-# --- Step 6: Inject custom wallpaper ---
-if [ -f "$WALLPAPER_FILE" ]; then
-    echo "[Step 6/9] Injecting custom wallpaper into USB..."
-    sudo bash "$SCRIPT_DIR/inject-wallpaper.sh" "" "$WALLPAPER_FILE" || {
-        echo "⚠️ Warning: Custom wallpaper injection encountered an issue, continuing..."
-    }
-else
-    echo "[Step 6/9] No custom wallpaper.png found, skipping injection."
-fi
+# --- Step 6: Inject custom wallpaper, graphics fallback, and VS Code extensions ---
+echo "[Step 6/9] Injecting custom wallpaper, graphics fallback, and VS Code extensions..."
+sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "" "$WALLPAPER_FILE" || {
+    echo "⚠️ Warning: Custom layer injection encountered an issue, continuing..."
+}
 echo ""
 
 # --- Step 7: Configure NVIDIA Bootloader compatibility ---
 echo "[Step 7/9] Configuring NVIDIA Safe Graphics / nomodeset boot options..."
-sudo bash "$SCRIPT_DIR/configure-nvidia-boot.sh" || {
+sudo bash "$SCRIPT_DIR/03-configure-nvidia-boot.sh" || {
     echo "⚠️ Warning: NVIDIA boot configuration encountered an issue, continuing..."
 }
 echo ""

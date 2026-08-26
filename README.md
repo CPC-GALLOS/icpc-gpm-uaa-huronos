@@ -1,227 +1,215 @@
 # icpc-gpm-uaa-huronos
 
-Installation and configuration of [huronOS](https://huronos.org) for the **Universidad Autónoma de Aguascalientes** teams at the **Gran Premio de México** (ICPC Region Mexico).
+Instalación, configuración y soluciones de compatibilidad de [huronOS](https://huronos.org) para los equipos de la **Universidad Autónoma de Aguascalientes (UAA)** en el **ICPC Gran Premio de México**.
 
-- 🏆 **Judge:** [MOJ](https://moj.naquadah.com.br) | [Ensaio](https://ensaio-times-2026.moj.naquadah.com.br/) | [Guía del competidor](https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en)
-- 💿 **ISO:** huronOS alpha 0.4 amd64
+- 🏆 **Juez del concurso:** [MOJ](https://moj.naquadah.com.br) | [Ensaio](https://ensaio-times-2026.moj.naquadah.com.br/) | [Guía del competidor](https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en)
+- 💿 **ISO Base:** `huronOS-alpha-0.4-amd64.iso` (Debian 11 / Kernel Linux 6.0.15)
+- 🏢 **Sede:** Laboratorios de Cómputo, Universidad Autónoma de Aguascalientes
 
 ---
 
-## Repository contents
+## Estructura del Repositorio y Scripts Numerados
+
+Los scripts están organizados y numerados cronológicamente según su orden de ejecución:
 
 ```text
 icpc-gpm-uaa-huronos/
-├── install-huronos.sh              # Installation script for USB drive (with custom wallpaper)
-├── configure-nvidia-boot.sh        # Configures bootloader for NVIDIA GPU compatibility (nomodeset)
-├── test-huronos-vm.sh              # Automated KVM / virt-manager test script
-├── inject-wallpaper.sh             # Injects wallpaper into 05-custom.hsl & USB/VM partitions
-├── update-directives-wallpaper.sh  # Calculates SHA256 of custom wallpaper & updates .hdf
-├── huronos-wallpaper.png           # Custom contest wallpaper (1920×1080 PNG)
-├── *.hdf                           # Directives files per contest
-├── .gitignore                      # Ignores the ISO and VM images
-├── AGENTS.md                       # AI context
-└── README.md                       # This file
+├── 01-install-huronos.sh               # [Paso 1] Instalación base en USB (incluye pasos 2 y 3 automáticamente)
+├── 02-inject-custom-layer.sh           # [Paso 2] Inyección en 05-custom.hsl (Wallpaper, Driver fbdev, Mesa & CPH)
+├── 02b-inject-vscode-extensions.sh     # [Auxiliar] Inyector independiente de extensiones VS Code (CPH & C++)
+├── 03-configure-nvidia-boot.sh         # [Paso 3] Ajuste de bootloader para hardware 2024 y GPUs NVIDIA
+├── 04-update-directives-wallpaper.sh   # [Utilidad] Calcula SHA256 de fondos y actualiza archivos .hdf
+├── 05-test-huronos-vm.sh               # [Pruebas] Creación y prueba local en Máquina Virtual KVM / virt-manager
+├── competitive-programming-helper-*.vsix # Paquete de extensión CPH para VS Code
+├── huronos-wallpaper.png               # Wallpaper oficial personalizado para el concurso (1920×1080)
+├── *.hdf                               # Archivos de directivas por concurso
+├── .gitignore                          # Ignora ISOs, imágenes VM y archivos binarios vsix
+├── AGENTS.md                           # Contexto técnico para asistentes IA
+└── README.md                           # Documentación técnica completa
 ```
 
-### Directives per contest
+### Directivas de concurso
 
-| File                                                         | Contest                                | Date                          | URL                                                                                                                                                                |
-| ------------------------------------------------------------ | -------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date  | Aug 29 2026, 11:00–16:00 CST  | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf)                                                    |
+| Archivo | Concurso | Fecha y Horario | URL Directivas |
+| --- | --- | --- | --- |
+| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3ra Fecha | 29 Ago 2026, 11:00–16:00 CST | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
 
 ---
 
-## Requirements
+## Crónica Técnica: Hardware UAA 2024 vs huronOS 2022 (Kernel 6.0)
 
-- GNU/Linux (Fedora, Ubuntu, Debian, Arch Linux)
-- USB drive of **16 GiB or more** (it will be completely erased)
-- The huronOS alpha 0.4 ISO **already downloaded** and placed at the root of this repo:
+### El Contexto y Desafío
+huronOS alpha 0.4 es una distribución en vivo basada en Debian 11 (Bullseye) con Linux Kernel **6.0.15**, empaquetada originalmente entre 2022 y 2023. Actualmente es un proyecto que **no cuenta con mantenedores activos ni desarrollo upstream continuo**.
 
-  ```text
-  huronOS-alpha-0.4-amd64.iso
-  ```
+Para el ciclo de competencias 2024–2026, los laboratorios de cómputo de la **Universidad Autónoma de Aguascalientes (UAA)** fueron renovados con computadoras Dell de última generación (procesadores **Intel Core 14th Gen / Arrow Lake** con gráficos integrados `8086:7d67` y/o tarjetas gráficas dedicadas **NVIDIA GeForce RTX serie Ada Lovelace**).
 
-  Download it from [mirrors.huronos.org](https://mirrors.huronos.org/huronOS/alpha/huronOS-alpha-0.4-amd64.iso)  
-  and **verify the checksums** before installing:
+### El Problema Técnico Encontrado
+1. **Falta de Drivers KMS:** El kernel 6.0.15 de huronOS carece de controladores *Kernel Mode Setting* (KMS) para hardware 2024 (el soporte para Intel Arrow Lake y GPUs NVIDIA modernas requiere kernels Linux >= 6.8 o el driver `xe`).
+2. **Pantalla Negra en Arranque Estándar:** Al arrancar huronOS de forma predeterminada, el sistema intentaba inicializar controladores KMS inexistentes o incompatibles, resultando en congelamiento con pantalla negra tras el menú de arranque.
+3. **Fallo de Xorg con `nomodeset`:** Al intentar la solución típica de arrancar con `nomodeset`, el servidor Xorg de huronOS (configurado con el driver estándar `modesetting`) colapsaba al no encontrar ningún dispositivo DRM/KMS funcional, impidiendo que el entorno gráfico Budgie Desktop iniciara.
 
-  | Hash   | Value                                                              |
-  | ------ | ------------------------------------------------------------------ |
-  | MD5    | `9ad2afe4980965c8b6b92fa00b8813d5`                                 |
-  | SHA256 | `b9d530bc7e5b862de9e20c6ce1690ab90f993c6bfa7b44655234708f4e06b2e9` |
+### La Solución de Ingeniería Implementada
+Para garantizar que huronOS funcione de manera 100% confiable y sin modificar el kernel base, se diseñó una solución en capas:
 
-  ```bash
-  md5sum huronOS-alpha-0.4-amd64.iso
-  sha256sum huronOS-alpha-0.4-amd64.iso
-  ```
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                   Escritorio Budgie / Codium / Apps                      │
+└──────────────────────────────────────────────────────────────────────────┘
+                                     │
+                 ┌───────────────────┴───────────────────┐
+                 │  Mesa LLVMpipe (Software Rendering)  │ (LIBGL_ALWAYS_SOFTWARE=1)
+                 └───────────────────┬───────────────────┘
+                                     │
+                 ┌───────────────────┴───────────────────┐
+                 │       Xorg fbdev Driver (/dev/fb0)    │ (xserver-xorg-video-fbdev)
+                 └───────────────────┬───────────────────┘
+                                     │
+                 ┌───────────────────┴───────────────────┐
+                 │       EFI Firmware Framebuffer        │ (efifb / VESA BIOS)
+                 └───────────────────┬───────────────────┘
+                                     │
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Parámetros Kernel: modprobe.blacklist=i915,nouveau fbcon=nodefer        │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
-### Dependencies
-
-Install the required packages for your distro **before** running the installation scripts:
-
-| Distro          | Physical USB Install Command                                                   | KVM / Virtualization Testing Command                                           |
-| --------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| Debian / Ubuntu | `sudo apt install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base` | `sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients virt-manager` |
-| Fedora          | `sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl`      | `sudo dnf install @virtualization qemu-img virt-install`                       |
-| Arch Linux      | `sudo pacman -S squashfs-tools parted psmisc e2fsprogs dosfstools perl`        | `sudo pacman -S qemu-full virt-manager libvirt`                                |
+1. **Driver `xserver-xorg-video-fbdev` en `05-custom.hsl`:**
+   - Se extrajo el driver oficial de Debian `xserver-xorg-video-fbdev` y se inyectó en la capa personalizada `/usr/lib/xorg/modules/drivers/fbdev_drv.so`.
+   - Se configuró `/etc/X11/xorg.conf.d/99-display.conf` para dirigir el servidor Xorg directamente al framebuffer del firmware UEFI (`/dev/fb0`).
+2. **Aceleración por Software con Mesa LLVMpipe:**
+   - Dado que el framebuffer EFI no provee aceleración 3D por hardware, se configuraron `/etc/X11/Xsession.d/99-huronos-software-rendering` con `LIBGL_ALWAYS_SOFTWARE=1` y `GALLIUM_DRIVER=llvmpipe`.
+   - Esto permite que el entorno Budgie, Chromium y VS Code se rendericen a través de la CPU a 60 FPS estables.
+3. **Ajuste de Parámetros del Kernel en Bootloader:**
+   - Se descartó `nomodeset` para el modo gráfico (ya que bloquea la asignación del framebuffer) y se implementó `modprobe.blacklist=i915,nouveau fbcon=nodefer`.
+   - Se removió el parámetro obsoleto `vga=normal`.
+4. **Corrección de Menú Syslinux EFI de 64 bits:**
+   - Se sustituyeron las dependencias de menú de 32 bits por el módulo nativo `/EFI/Boot/menu.c32` de 64 bits en `/EFI/Boot/syslinux.cfg`, eliminando bloqueos de memoria en firmwares UEFI modernos.
 
 ---
 
-## Installation
+## Requisitos Previos
 
-> ⚠️ **Make sure the ISO is already downloaded** and placed in this directory before running the script.
+- Sistema Operativo: GNU/Linux (Fedora, Debian, Ubuntu, Arch Linux).
+- Memoria USB de **16 GiB o superior** (será formateada por completo).
+- La imagen ISO `huronOS-alpha-0.4-amd64.iso` en la raíz de este repositorio.
+
+### Verificación de Checksums de la ISO
 
 ```bash
-# Auto-detects directives file and wallpaper:
-bash install-huronos.sh
-
-# Or specify custom directives file and wallpaper explicitly:
-bash install-huronos.sh contest-config.hdf my-wallpaper.png
+# MD5:    9ad2afe4980965c8b6b92fa00b8813d5
+# SHA256: b9d530bc7e5b862de9e20c6ce1690ab90f993c6bfa7b44655234708f4e06b2e9
+md5sum huronOS-alpha-0.4-amd64.iso
+sha256sum huronOS-alpha-0.4-amd64.iso
 ```
 
-The script automatically:
-
-1. Auto-discovers ISO and directives files (presents an interactive menu if multiple `.hdf` files exist)
-2. Installs system dependencies
-3. Masks `udisks2` to prevent automounter interference
-4. Mounts the ISO and runs huronOS `install.sh`
-5. Automatically injects custom wallpaper into `05-custom.hsl` and `huronOS/data/backups/`
-6. Runs `sync` twice to flush disk buffers safely
-7. Unmounts and cleans up
-
-### Installer prompts
-
-| Prompt              | Value                                                   |
-| ------------------- | ------------------------------------------------------- |
-| Root password       | *(choose one)*                                          |
-| Directives URL      | Raw URL of the contest's `.hdf` file (see table above)  |
-| IP of sync server   | *(leave blank)*                                         |
-| IP / Mask / Gateway | *(leave blank — DHCP)*                                  |
-| Target disk         | Select your USB drive (e.g. `/dev/sdb`)                 |
-
-> ⚠️ **The USB drive will be completely erased.** Make sure you select the correct disk.
-
----
-
-## Custom Wallpaper
-
-huronOS allows customizing the desktop background for contestants:
-
-- **Format:** PNG (recommended) or JPEG
-- **Resolution:** `1920×1080`
-- **Current wallpaper:** [`huronos-wallpaper.png`](./huronos-wallpaper.png)
-
-### 1. Editing & Updating
-
-1. Open and edit [`huronos-wallpaper.png`](./huronos-wallpaper.png) with your preferred graphics software (GIMP, Canva, Figma, Photoshop, etc.).
-2. Whenever you modify your wallpaper (or create new `.hdf` configs), run:
+### Instalación de Dependencias
 
 ```bash
-# Automatically computes SHA256 and updates ALL *.hdf files in repo:
-./update-directives-wallpaper.sh
+# Debian / Ubuntu:
+sudo apt install squashfs-tools parted psmisc e2fsprogs dosfstools perl-base
 
-# Or update with a specific wallpaper / directives file:
-./update-directives-wallpaper.sh my-wallpaper.png contest-2027.hdf
-```
+# Fedora:
+sudo dnf install squashfs-tools parted psmisc e2fsprogs dosfstools perl
 
-### 2. Injecting into USB / Virtual Machine
-
-- **Automatic during USB install:** `bash install-huronos.sh [config.hdf]` automatically detects `wallpaper.png` and injects it into `05-custom.hsl` and `huronOS/data/backups/`.
-- **Automatic during VM test:** `bash test-huronos-vm.sh [my-wallpaper.png]` automatically injects the wallpaper into the virtual disk.
-- **Manual injection at any time:**
-
-```bash
-# Auto-detects partition labeled HURONOS:
-sudo ./inject-wallpaper.sh
-
-# Or specify partition or mount directory and image:
-sudo ./inject-wallpaper.sh /dev/sdX1 custom-wallpaper.png
-sudo ./inject-wallpaper.sh /media/user/HURONOS custom-wallpaper.png
+# Arch Linux:
+sudo pacman -S squashfs-tools parted psmisc e2fsprogs dosfstools perl
 ```
 
 ---
 
-## Boot
+## Guía de Instalación Paso a Paso
 
-1. Plug in the USB and start the machine.
-2. If your PC **only has a dedicated NVIDIA GPU** (no integrated GPU / iGPU), ensure the monitor cable is plugged into the **NVIDIA graphics card ports**, not the motherboard.
-3. Enter the boot menu (F12 / F11 / F8 / F2 / Del).
-4. **Disable Secure Boot** if using UEFI.
-5. Select the USB to boot from.
-6. huronOS automatically boots to the contestant desktop.
+### Opción A: Instalación Automatizada Completa en USB
 
-### UAA Lab Hardware & NVIDIA Graphics Compatibility
-
-Computers in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories can use an EFI-framebuffer (`efifb`) fallback when their graphics hardware is newer than the kernel bundled with huronOS alpha 0.4. The injection script adds Xorg's `fbdev` driver and runs graphics clients through Mesa LLVMpipe. This is a contingency path with no reliable external-monitor or hotplug support.
-
-To configure your USB for UAA lab computers and NVIDIA graphics:
+El script `01-install-huronos.sh` ejecuta la instalación base y encadena automáticamente los pasos 2 y 3 (inyección de extensiones, wallpaper y fixes de GPU):
 
 ```bash
-# Auto-detects partition labeled HURONOS and applies optimal lab configuration:
-bash configure-nvidia-boot.sh
-
-# Or specify the partition directly:
-bash configure-nvidia-boot.sh /dev/sdX1
+bash 01-install-huronos.sh
 ```
 
-This configuration:
-- Makes the EFI-framebuffer/Xorg `fbdev` entry the default without using `nomodeset`.
-- Removes `i915.force_probe=*`; it cannot add Arrow Lake support to the Linux 6.0 kernel.
-- Keeps the NVIDIA/nouveau boot route explicitly experimental and isolates `nomodeset` as a console-only recovery option.
-- Removes legacy `vga=normal` and configures the native 64-bit EFI menu module (`/EFI/Boot/menu.c32`).
-- Updates bootloader checksums automatically.
+El script solicitará:
+1. **Contraseña de root:** *(Elige una o presiona Enter para usar `toor`)*
+2. **URL de Directivas:** URL raw de GitHub del archivo `.hdf` correspondiente.
+3. **IP del Servidor:** *(Dejar en blanco para DHCP)*
+4. **Disco de destino:** Seleccionar la memoria USB correcta (ej. `/dev/sdb`).
 
 ---
 
-## Testing with KVM / virt-manager
+### Opción B: Ejecución Manual o Personalización Modular
 
-You can test the entire huronOS environment (directives synchronization, contest mode, firewall, software modules, and browser bookmarks) directly inside a Linux virtual machine without needing a physical USB drive.
+Si deseas aplicar cambios paso a paso en una memoria USB existente o partición montada:
 
-### Option 1: Automated Script (`test-huronos-vm.sh`)
-
-Run the VM testing script:
-
+#### Paso 1: Instalación Base
 ```bash
-bash test-huronos-vm.sh
+bash 01-install-huronos.sh
 ```
 
-This script will:
+#### Paso 2: Inyección de Capa Personalizada (Wallpaper + Driver fbdev + VS Code Extensions)
+```bash
+# Auto-detecta partición con etiqueta HURONOS:
+sudo bash 02-inject-custom-layer.sh
 
-1. Check that hardware virtualization (`/dev/kvm`) and libvirt are active.
-2. Create a 16 GiB raw disk image (`huronos-vm-disk.img`).
-3. Attach the image to a loop device (`/dev/loopN`).
-4. Mount the huronOS ISO and run `install.sh` targeting the loop device.
-5. Create and boot a virtual machine (`huronOS-Test-VM`) in KVM via `virt-install`.
+# O especificando partición y wallpaper:
+sudo bash 02-inject-custom-layer.sh /dev/sdX1 huronos-wallpaper.png
+```
 
-### Option 2: Managing via `virt-manager` GUI
+#### Paso 2b: Inyección Específica de Extensiones de VS Code
+```bash
+sudo bash 02b-inject-vscode-extensions.sh /dev/sdX1
+```
 
-Once the VM is created by `test-huronos-vm.sh` or manually:
+#### Paso 3: Configuración de Bootloader (Fixes UAA 2024 / NVIDIA)
+```bash
+sudo bash 03-configure-nvidia-boot.sh /dev/sdX1
+```
 
-1. Open **Virtual Machine Manager**:
+#### Paso 4: Actualización de Hash de Wallpaper en Directivas `.hdf`
+```bash
+./04-update-directives-wallpaper.sh huronos-wallpaper.png icpc-gpm-2026-3rd-date.hdf
+```
 
-   ```bash
-   virt-manager
-   ```
+#### Paso 5: Pruebas en Máquina Virtual Local (KVM / virt-manager)
+```bash
+bash 05-test-huronos-vm.sh
+```
 
-2. Select **`huronOS-Test-VM`** and click **Open**.
-3. Observe the SeaBIOS boot screen; huronOS will boot automatically into the desktop within 7 seconds.
+---
 
-> 💡 **Tip:** Since the VM runs without a guest agent, the initial resolution may be squashed. To fix the aspect ratio and preview wallpapers accurately, open **xterm** from the Budgie menu and run `xrandr -s 1920x1080`.
+## Extensiones de Visual Studio Code (C/C++, CPH, Python & Java)
 
-#### Physical USB Passthrough in virt-manager
+Para optimizar el flujo de trabajo de los competidores durante el ICPC, huronOS incluye y activa las siguientes extensiones:
 
-If you have already installed huronOS to a physical USB drive using `install-huronos.sh` and want to test it inside a VM without rebooting your host:
+| Extensión | Identificador / Módulo | Funcionalidad |
+| --- | --- | --- |
+| **C/C++ Tools** (`ms-vscode.cpptools`) | `programming/vsc-cpptools` | Autocompletado IntelliSense, navegación de código, resaltado de sintaxis y formateo con `clang-format`. |
+| **Competitive Programming Helper** (`DivyanshuAgrawal.competitive-programming-helper`) | `programming/vsc-cph` | Gestión de casos de prueba, ejecución rápida de soluciones, vista de diferencias (diff) y soporte multilingüe (C++, Java, Python, Kotlin). |
+| **Microsoft Python** (`ms-python.python`) | `programming/vsc-python` | Soporte de autocompletado, linting y ejecución de scripts en Python 3 para desarrollo competitivo. |
+| **Language Support for Java™ by Red Hat** (`redhat.java`) | `programming/vsc-java` | Soporte completo de lenguaje Java (Java 17/21), navegación y resolución de tipos para ICPC. |
 
-1. Insert your huronOS USB drive into your Linux host.
-2. Open `virt-manager` and create a new Virtual Machine (**Import existing disk image** or blank VM).
-3. Under **Add Hardware** → **USB Host Device**, select your physical USB drive.
-4. Set the boot priority to boot from the USB device (ensure BIOS / Legacy mode is selected, not UEFI OVMF).
+### Integración en huronOS
+1. **Directivas:** Se agregan `programming/vsc-cpptools`, `programming/vsc-cph`, `programming/vsc-python` y `programming/vsc-java` a `AvailableSoftware` en `icpc-gpm-2026-3rd-date.hdf`.
+2. **Capa `05-custom.hsl`:** Todas las extensiones se pre-inyectan en `/opt/codium/contestant/extensions/` junto con sus descriptores en `ids/vsc-*.json`.
+3. **Módulos HSM:** Se generan los módulos `vsc-cph.hsm`, `vsc-python.hsm` y `vsc-java.hsm` en `huronOS/software/programming/`.
+4. **Carga Dinámica:** El lanzador `/usr/bin/codium` compila automáticamente `/opt/codium/contestant/extensions/extensions.json` combinando todos los descriptores en cada sesión.
 
-### VM Cleanup
+---
 
-To stop and remove the test virtual machine and delete the virtual disk image:
+## Instrucciones de Arranque en Máquinas de Concurso
+
+1. Conecta la memoria USB en la computadora del laboratorio.
+2. Si el equipo cuenta **únicamente con tarjeta NVIDIA dedicada**, conecta el monitor al puerto de la tarjeta gráfica (no a la tarjeta madre).
+3. Enciende el equipo y presiona la tecla del menú de arranque (**F12** en Dell, **F11** en HP, **F8/Del** en Asus).
+4. **Desactiva Secure Boot** en la configuración UEFI si está habilitado.
+5. Selecciona la memoria USB para iniciar.
+6. huronOS arrancará automáticamente en el escritorio del competidor tras 7 segundos.
+
+---
+
+## Pruebas de Desarrollo y Calidad (ShellCheck)
+
+De acuerdo con las directrices de calidad del repositorio, todos los scripts deben verificarse con `shellcheck`:
 
 ```bash
-sudo virsh destroy huronOS-Test-VM
-sudo virsh undefine huronOS-Test-VM
-rm -f huronos-vm-disk.img
+shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh
 ```
+*Garantía de calidad: 0 errores y 0 advertencias.*

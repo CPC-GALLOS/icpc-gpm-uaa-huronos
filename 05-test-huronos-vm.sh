@@ -1,11 +1,11 @@
 #!/bin/env bash
 # =============================================================================
-# huronOS KVM / virt-manager Test Script — CPC GALLOS / UAA
+# 05-test-huronos-vm.sh — CPC GALLOS / UAA
 # Creates a virtual disk image, installs huronOS onto it via loop device,
 # and boots a KVM VM to test directives, firewall, and software modules.
 # =============================================================================
 # Usage:
-#   bash test-huronos-vm.sh
+#   bash 05-test-huronos-vm.sh
 # =============================================================================
 
 set -e
@@ -160,13 +160,11 @@ if [ "$SKIP_INSTALL" != "true" ]; then
         fi
     fi
 
-    if [ -f "$VM_WALLPAPER" ]; then
-        echo ""
-        echo "[Step 4.8/6] Injecting custom wallpaper ($VM_WALLPAPER) into VM disk image..."
-        sudo bash "$SCRIPT_DIR/inject-wallpaper.sh" "${LOOP_DEV}p1" "$VM_WALLPAPER" || {
-            echo "⚠️ Warning: Custom wallpaper injection encountered an issue, continuing..."
-        }
-    fi
+    echo ""
+    echo "[Step 4.8/6] Injecting custom wallpaper ($VM_WALLPAPER), graphics fallback, and VS Code extensions into VM disk image..."
+    sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "${LOOP_DEV}p1" "$VM_WALLPAPER" || {
+        echo "⚠️ Warning: Custom layer injection encountered an issue, continuing..."
+    }
 
     echo ""
     echo "[Step 5/6] Flushing disk buffers..."

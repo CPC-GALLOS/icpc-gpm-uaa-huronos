@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# update-directives-wallpaper.sh — CPC GALLOS / UAA
+# 04-update-directives-wallpaper.sh — CPC GALLOS / UAA
 # Generic tool to calculate wallpaper SHA256 and update any/all .hdf files.
 #
 # Usage:
-#   ./update-directives-wallpaper.sh [wallpaper_file] [directives_file.hdf]
+#   ./04-update-directives-wallpaper.sh [wallpaper_file] [directives_file.hdf]
 # Examples:
-#   ./update-directives-wallpaper.sh                               # Updates all *.hdf files with wallpaper.png
-#   ./update-directives-wallpaper.sh my-wallpaper.png             # Updates all *.hdf with my-wallpaper.png
-#   ./update-directives-wallpaper.sh wallpaper.png contest.hdf    # Updates contest.hdf with wallpaper.png
-#   ./update-directives-wallpaper.sh contest.hdf                  # Updates contest.hdf with default wallpaper.png
+#   ./04-update-directives-wallpaper.sh                               # Updates all *.hdf files with wallpaper.png
+#   ./04-update-directives-wallpaper.sh my-wallpaper.png             # Updates all *.hdf with my-wallpaper.png
+#   ./04-update-directives-wallpaper.sh wallpaper.png contest.hdf    # Updates contest.hdf with wallpaper.png
+#   ./04-update-directives-wallpaper.sh contest.hdf                  # Updates contest.hdf with default wallpaper.png
 # =============================================================================
 
 set -e

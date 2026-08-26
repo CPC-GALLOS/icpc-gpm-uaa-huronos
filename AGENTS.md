@@ -113,6 +113,7 @@ WallpaperSha256=<sha256 of wallpaper image>
 | `programming/joe` | Joe editor |
 | `programming/vsc-clangd` | VSCode ClangD extension |
 | `programming/vsc-cpptools` | VSCode C++ Tools extension |
+| `programming/vsc-cph` | VSCode Competitive Programming Helper (cph) extension |
 | `programming/vsc-cpp-compile-run` | VSCode CPP Compile/Run |
 | `programming/vsc-vscodevim` | VSCode Vim extension |
 | `programming/vsc-makefile-tools` | VSCode Makefile Tools |
@@ -177,6 +178,7 @@ Key settings:
 - Contest firewall: `all` (sin firewall / sin drop para compatibilidad con MOJ)
 - Contest USB storage: disabled
 - Bookmarks in all modes: `MOJ Contest`, `MOJ Ensaio`, `Guia MOJ`, `ICPC Mexico`
+- Available software includes: `programming/vscode`, `programming/vsc-cpptools`, `programming/vsc-cph`, `programming/vsc-python`, `programming/vsc-java`
 
 ---
 
@@ -184,10 +186,10 @@ Key settings:
 
 huronOS can be tested locally inside KVM without burning a physical USB:
 
-- **Automated setup script:** `test-huronos-vm.sh`
+- **Automated setup script:** `05-test-huronos-vm.sh`
 - **Method:** Creates a 16 GiB raw disk image (`huronos-vm-disk.img`), attaches it as a loop device (`/dev/loopN`), runs `install.sh` from the ISO onto the loop device, and launches `virt-install`.
 - **Boot mode:** SeaBIOS (BIOS/MBR legacy boot) — DO NOT use OVMF/UEFI as huronOS uses extlinux.
-- **Physical USB passthrough:** A physical USB created with `install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager`.
+- **Physical USB passthrough:** A physical USB created with `01-install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager`.
 
 ---
 
@@ -199,9 +201,36 @@ huronOS can be tested locally inside KVM without burning a physical USB:
   - `huronOS/data/backups/`: Pre-seeded `{Always,Event,Contest}-mode-wallpaper.*`.
   - Directives `.hdf`: `Wallpaper=` and `WallpaperSha256=`.
 - **Scripts:**
-  - `update-directives-wallpaper.sh`: Computes SHA256 of `huronos-wallpaper.png` and updates `.hdf`.
-  - `inject-wallpaper.sh`: Injects custom wallpaper into a huronOS USB partition, VM image, or mounted filesystem.
-  - `install-huronos.sh` & `test-huronos-vm.sh`: Both automatically call `inject-wallpaper.sh` after base installation.
+  - `04-update-directives-wallpaper.sh`: Computes SHA256 of `huronos-wallpaper.png` and updates `.hdf`.
+  - `02-inject-custom-layer.sh`: Injects custom wallpaper into a huronOS USB partition, VM image, or mounted filesystem.
+  - `01-install-huronos.sh` & `05-test-huronos-vm.sh`: Both automatically call `02-inject-custom-layer.sh` after base installation.
+
+---
+
+## VS Code Extensions Integration (C/C++, CPH, Python & Red Hat Java)
+
+To provide an optimal competitive programming development environment in huronOS:
+
+1. **`ms-vscode.cpptools` (C/C++ Tools)**: Pre-packaged in the base ISO as `huronOS/software/programming/vsc-cpptools.hsm` (v1.16.3). Activated via directives `programming/vsc-cpptools`.
+2. **`DivyanshuAgrawal.competitive-programming-helper` (CPH)**:
+   - Packaged as `huronOS/software/programming/vsc-cph.hsm` and injected into `05-custom.hsl`.
+   - Manifest: `/opt/codium/contestant/extensions/ids/vsc-cph.json`.
+   - Files: `/opt/codium/contestant/extensions/DivyanshuAgrawal.competitive-programming-helper-2077.0.0/`.
+3. **`ms-python.python` (Microsoft Python)**:
+   - Packaged as `huronOS/software/programming/vsc-python.hsm` and injected into `05-custom.hsl`.
+   - Manifest: `/opt/codium/contestant/extensions/ids/vsc-python.json`.
+   - Files: `/opt/codium/contestant/extensions/ms-python.python-2023.14.0/`.
+   - Compatible with VSCodium 1.81.1 runtime (`engines.vscode: ^1.79.0`).
+4. **`redhat.java` (Language Support for Java by Red Hat)**:
+   - Packaged as `huronOS/software/programming/vsc-java.hsm` and injected into `05-custom.hsl`.
+   - Manifest: `/opt/codium/contestant/extensions/ids/vsc-java.json`.
+   - Files: `/opt/codium/contestant/extensions/redhat.java-1.40.0/`.
+   - Standard language server for Java competitive development.
+5. **Runtime Lifecycle**:
+   - On Codium startup, `/usr/bin/codium` generates `/opt/codium/contestant/extensions/extensions.json` containing all extension descriptors in `ids/` and loads them with `--extensions-dir`.
+6. **Scripts**:
+   - `02b-inject-vscode-extensions.sh`: Standalone script to download/unpack all VSIX extensions, generate `.hsm` modules, inject into `05-custom.hsl`, and refresh checksums.
+   - `02-inject-custom-layer.sh`, `01-install-huronos.sh`, `05-test-huronos-vm.sh`: Automatically perform extension injection during installation and VM setup.
 
 ---
 
@@ -214,7 +243,7 @@ On systems in the **Universidad Autónoma de Aguascalientes (UAA)** contest labo
 - **Native 64-bit EFI menu**: (`/EFI/Boot/menu.c32` in `/EFI/Boot/syslinux.cfg`) to ensure UEFI boots without crashing Syslinux EFI.
 - **Removal of `vga=normal`**: from kernel parameters.
 
-**Automated script:** `configure-nvidia-boot.sh` automatically updates both `/boot/huronos.cfg` (Legacy BIOS) and `/EFI/Boot/syslinux.cfg` (UEFI) and refreshes checksums.
+**Automated script:** `03-configure-nvidia-boot.sh` automatically updates both `/boot/huronos.cfg` (Legacy BIOS) and `/EFI/Boot/syslinux.cfg` (UEFI) and refreshes checksums.
 
 ---
 
@@ -224,7 +253,7 @@ On systems in the **Universidad Autónoma de Aguascalientes (UAA)** contest labo
 > **Mandatory verification:** Any modified or newly created shell script (`*.sh`) in this repository **must always be verified with `shellcheck`**:
 >
 > ```bash
-> shellcheck install-huronos.sh test-huronos-vm.sh inject-wallpaper.sh update-directives-wallpaper.sh configure-nvidia-boot.sh
+> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh
 > ```
 >
 > All scripts in this repo must pass `shellcheck` with zero errors and zero warnings before committing.

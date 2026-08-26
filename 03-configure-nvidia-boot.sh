@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# configure-nvidia-boot.sh — CPC GALLOS / UAA
+# 03-configure-nvidia-boot.sh — CPC GALLOS / UAA
 # Configures huronOS bootloader for compatibility with UAA computer labs
 # and machines with dedicated NVIDIA GPUs (RTX / Ada / GTX) and Intel CPUs.
 #
@@ -9,7 +9,7 @@
 # NVIDIA Ada hardware with i915/nouveau merely by force-probing.
 #
 # Usage:
-#   bash configure-nvidia-boot.sh [/dev/sdX1 | /path/to/mounted/HURONOS]
+#   bash 03-configure-nvidia-boot.sh [/dev/sdX1 | /path/to/mounted/HURONOS]
 # =============================================================================
 
 set -e

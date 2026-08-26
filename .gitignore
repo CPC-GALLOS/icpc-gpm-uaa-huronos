@@ -10,3 +10,6 @@
 
 # Ignore VM disk images
 *.img
+
+# ignore vsix files
+*.vsix
