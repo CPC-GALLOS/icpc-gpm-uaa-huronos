@@ -33,6 +33,8 @@ fi
 
 WALLPAPER_SHA=$(sha256sum "$WALLPAPER_SRC" | awk '{print $1}')
 FILE_INFO=$(file "$WALLPAPER_SRC")
+FBDEV_DEB_URL="https://deb.debian.org/debian/pool/main/x/xserver-xorg-video-fbdev/xserver-xorg-video-fbdev_0.5.0-1_amd64.deb"
+FBDEV_DEB_SHA256="cccf3792ff2b6c95b55269b67ca7c5213a00561711fe8d10e5436961faf5d9d9"
 echo "✓ Wallpaper source: $WALLPAPER_SRC"
 echo "  Type:   $FILE_INFO"
 echo "  SHA256: $WALLPAPER_SHA"
@@ -136,30 +138,56 @@ echo "Injecting wallpaper as /usr/share/backgrounds/huronos-background.png..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/backgrounds"
 cp -f "$WALLPAPER_SRC" "$TMP_LAB/squashfs-root/usr/share/backgrounds/huronos-background.png"
 
-echo "Injecting universal Xorg display configuration into 05-custom.hsl..."
-mkdir -p "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d"
+echo "Removing rigid Xorg display configuration from 05-custom.hsl..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d"
 mkdir -p "$TMP_LAB/squashfs-root/etc/alternatives"
+mkdir -p "$TMP_LAB/squashfs-root/usr/lib/xorg/modules/drivers"
+mkdir -p "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d"
+mkdir -p "$TMP_LAB/fbdev-package"
 
-# 1. Provide universal modesetting/fallback screen configuration
-cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-modesetting.conf"
+# Let Xorg auto-probe the available KMS device.  A hard-coded Screen section
+# prevents valid fallback devices (for example simpledrm) from being selected.
+rm -f "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-modesetting.conf"
+
+echo "Downloading the Debian fbdev Xorg driver..."
+curl -fsSL --retry 2 -o "$TMP_LAB/fbdev.deb" "$FBDEV_DEB_URL"
+echo "$FBDEV_DEB_SHA256  $TMP_LAB/fbdev.deb" | sha256sum -c -
+(
+    cd "$TMP_LAB/fbdev-package"
+    ar x "$TMP_LAB/fbdev.deb"
+    tar -xJf data.tar.xz ./usr/lib/xorg/modules/drivers/fbdev_drv.so
+)
+install -m 0755 "$TMP_LAB/fbdev-package/usr/lib/xorg/modules/drivers/fbdev_drv.so" \
+    "$TMP_LAB/squashfs-root/usr/lib/xorg/modules/drivers/fbdev_drv.so"
+
+cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-display.conf"
+# Linux 6.0 in huronOS alpha 0.4 has no KMS driver for Intel Arrow Lake.
+# Use the EFI framebuffer exposed as /dev/fb0, not the modesetting driver.
 Section "Device"
-    Identifier "Card0"
-    Driver "modesetting"
+    Identifier "EFI framebuffer"
+    Driver "fbdev"
+    Option "fbdev" "/dev/fb0"
 EndSection
 
 Section "Screen"
-    Identifier "Screen0"
-    Device "Card0"
+    Identifier "Default Screen"
+    Device "EFI framebuffer"
 EndSection
 EOF
 
-# 2. Disable conflicting NVIDIA proprietary output class
+mkdir -p "$TMP_LAB/squashfs-root/etc/X11/Xsession.d"
+cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/Xsession.d/99-huronos-software-rendering"
+# Render OpenGL clients with Mesa LLVMpipe; efifb has no 3D acceleration.
+export LIBGL_ALWAYS_SOFTWARE=1
+export GALLIUM_DRIVER=llvmpipe
+EOF
+
+# Disable a conflicting NVIDIA proprietary output class.
 cat << 'EOF' > "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d/nvidia-drm-outputclass.conf"
 # Disabled for universal Intel/AMD/NVIDIA open-source compatibility
 EOF
 
-# 3. Ensure GLX points to Mesa universal driver
+# Keep the immutable image on Mesa rather than the absent legacy NVIDIA GLX.
 ln -sf /usr/lib/mesa-diverted "$TMP_LAB/squashfs-root/etc/alternatives/glx"
 ln -sf /usr/lib/xorg/modules/extensions/libglx.so "$TMP_LAB/squashfs-root/etc/alternatives/glx--libglxserver_nvidia.so"
 
@@ -169,21 +197,29 @@ mksquashfs "$TMP_LAB/squashfs-root" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -
 
 cp -f "$TMP_LAB/05-custom.hsl" "$CUSTOM_HSL"
 rm -rf "$TMP_LAB"
-echo "✓ Updated $CUSTOM_HSL (with wallpaper + universal Xorg/Mesa fix)"
+echo "✓ Updated $CUSTOM_HSL (with wallpaper and automatic Xorg/Mesa configuration)"
 
 # 5. Pre-seed wallpaper in huronOS/data/backups/
 mkdir -p "$DATA_BACKUPS_DIR"
 WALL_BASENAME="$(basename "$WALLPAPER_SRC")"
 WALL_EXT="${WALL_BASENAME##*.}"
 
-cp -f "$WALLPAPER_SRC" "$DATA_BACKUPS_DIR/Always-mode-wallpaper.${WALL_EXT}"
-cp -f "$WALLPAPER_SRC" "$DATA_BACKUPS_DIR/Event-mode-wallpaper.${WALL_EXT}"
-cp -f "$WALLPAPER_SRC" "$DATA_BACKUPS_DIR/Contest-mode-wallpaper.${WALL_EXT}"
+copy_wallpaper_if_needed() {
+    local destination="$1"
+
+    if [ ! -e "$destination" ] || ! cmp -s "$WALLPAPER_SRC" "$destination"; then
+        cp -f "$WALLPAPER_SRC" "$destination"
+    fi
+}
+
+copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Always-mode-wallpaper.${WALL_EXT}"
+copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Event-mode-wallpaper.${WALL_EXT}"
+copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Contest-mode-wallpaper.${WALL_EXT}"
 # Also seed .png aliases if extension is not png for fallback
 if [ "$WALL_EXT" != "png" ]; then
-    cp -f "$WALLPAPER_SRC" "$DATA_BACKUPS_DIR/Always-mode-wallpaper.png"
-    cp -f "$WALLPAPER_SRC" "$DATA_BACKUPS_DIR/Event-mode-wallpaper.png"
-    cp -f "$WALLPAPER_SRC" "$DATA_BACKUPS_DIR/Contest-mode-wallpaper.png"
+    copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Always-mode-wallpaper.png"
+    copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Event-mode-wallpaper.png"
+    copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Contest-mode-wallpaper.png"
 fi
 echo "✓ Pre-seeded Always, Event, and Contest mode wallpapers in huronOS/data/backups/"
 

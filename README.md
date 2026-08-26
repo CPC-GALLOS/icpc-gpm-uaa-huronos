@@ -151,7 +151,7 @@ sudo ./inject-wallpaper.sh /media/user/HURONOS custom-wallpaper.png
 
 ### UAA Lab Hardware & NVIDIA Graphics Compatibility
 
-Computers in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories (Dell systems with Intel CPU + dedicated NVIDIA RTX/Ada/GTX graphics) require specific boot options to avoid GPU hangs and ensure the `modesetting` Xorg display manager starts properly.
+Computers in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories can use an EFI-framebuffer (`efifb`) fallback when their graphics hardware is newer than the kernel bundled with huronOS alpha 0.4. The injection script adds Xorg's `fbdev` driver and runs graphics clients through Mesa LLVMpipe. This is a contingency path with no reliable external-monitor or hotplug support.
 
 To configure your USB for UAA lab computers and NVIDIA graphics:
 
@@ -164,8 +164,9 @@ bash configure-nvidia-boot.sh /dev/sdX1
 ```
 
 This configuration:
-- Enables **DRM KMS modesetting** (keeping `/dev/dri/card0` active for Intel/modesetting display drivers).
-- Blacklists `nouveau` (`modprobe.blacklist=nouveau`) to prevent kernel hangs on modern NVIDIA RTX/Ada architectures lacking open-source firmware in the base kernel.
+- Makes the EFI-framebuffer/Xorg `fbdev` entry the default without using `nomodeset`.
+- Removes `i915.force_probe=*`; it cannot add Arrow Lake support to the Linux 6.0 kernel.
+- Keeps the NVIDIA/nouveau boot route explicitly experimental and isolates `nomodeset` as a console-only recovery option.
 - Removes legacy `vga=normal` and configures the native 64-bit EFI menu module (`/EFI/Boot/menu.c32`).
 - Updates bootloader checksums automatically.
 

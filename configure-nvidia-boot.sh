@@ -4,8 +4,9 @@
 # Configures huronOS bootloader for compatibility with UAA computer labs
 # and machines with dedicated NVIDIA GPUs (RTX / Ada / GTX) and Intel CPUs.
 #
-# Enables DRM KMS modesetting, uses 'nouveau.noaccel=1' for NVIDIA display
-# output compatibility, 'i915.force_probe=*' for Intel Core Ultra, and fixes EFI syslinux.
+# Keeps the EFI framebuffer available for Xorg's fbdev driver and fixes EFI
+# syslinux. Kernel 6.0 cannot drive Intel Arrow Lake (8086:7d67) or recent
+# NVIDIA Ada hardware with i915/nouveau merely by force-probing.
 #
 # Usage:
 #   bash configure-nvidia-boot.sh [/dev/sdX1 | /path/to/mounted/HURONOS]
@@ -125,36 +126,36 @@ MENU tabmsg Press [Tab] to edit options, [Enter] to boot
 
 MENU AUTOBOOT [Esc] -> options, Booting in # second{,s}
 
-DEFAULT persistent
-LABEL persistent
-  MENU LABEL ^1. Start contest system (NVIDIA Primary / UAA Lab - Default)
+DEFAULT persistent-fbdev
+LABEL persistent-fbdev
+  MENU LABEL ^1. Start contest system (EFI framebuffer / fbdev - Default)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nouveau.modeset=1 nouveau.noaccel=1 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=i915,nouveau fbcon=nodefer $HURONOS_FLAGS
 
 LABEL persistent-intel
-  MENU LABEL ^2. Start contest system (Intel Integrated Only)
+  MENU LABEL ^2. Start contest system (Intel DRM - supported hardware only)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=nouveau i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=nouveau $HURONOS_FLAGS
 
 LABEL standard
-  MENU LABEL ^3. Start contest system (Standard Auto Graphics)
+  MENU LABEL ^3. Start contest system (experimental NVIDIA DRM)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nouveau.modeset=1 nouveau.noaccel=1 $HURONOS_FLAGS
 
 LABEL persistent-debug
   MENU LABEL ^4. Start contest system (Verbose Debug Mode)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 debug loglevel=7 nouveau.modeset=1 nouveau.noaccel=1 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 debug loglevel=7 modprobe.blacklist=i915,nouveau fbcon=nodefer $HURONOS_FLAGS
 
 LABEL persistent-nomodeset
-  MENU LABEL ^5. Start contest system (Safe Fallback / nomodeset)
+  MENU LABEL ^5. Start contest system (console-only / nomodeset)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
   APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nomodeset nouveau.modeset=0 modprobe.blacklist=nouveau $HURONOS_FLAGS
 
 LABEL nosync
   MENU LABEL ^6. Start no-sync mode
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nouveau.modeset=1 nouveau.noaccel=1 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=i915,nouveau fbcon=nodefer $HURONOS_FLAGS
 EOF
 echo "✓ Updated $CFG_BOOT"
 
@@ -172,36 +173,36 @@ MENU COLOR unsel 37;44 #ffffffff #00000000 none
 MENU COLOR tabmsg * #ffffffff #00000000 *
 MENU tabmsg Press [Tab] to edit options, [Enter] to boot
 
-DEFAULT persistent
-LABEL persistent
-  MENU LABEL ^1. Start contest system (NVIDIA Primary / UAA Lab - Default)
+DEFAULT persistent-fbdev
+LABEL persistent-fbdev
+  MENU LABEL ^1. Start contest system (EFI framebuffer / fbdev - Default)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nouveau.modeset=1 nouveau.noaccel=1 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=i915,nouveau fbcon=nodefer $HURONOS_FLAGS
 
 LABEL persistent-intel
-  MENU LABEL ^2. Start contest system (Intel Integrated Only)
+  MENU LABEL ^2. Start contest system (Intel DRM - supported hardware only)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=nouveau i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=nouveau $HURONOS_FLAGS
 
 LABEL standard
-  MENU LABEL ^3. Start contest system (Standard Auto Graphics)
+  MENU LABEL ^3. Start contest system (experimental NVIDIA DRM)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nouveau.modeset=1 nouveau.noaccel=1 $HURONOS_FLAGS
 
 LABEL persistent-debug
   MENU LABEL ^4. Start contest system (Verbose Debug Mode)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 debug loglevel=7 nouveau.modeset=1 nouveau.noaccel=1 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 debug loglevel=7 modprobe.blacklist=i915,nouveau fbcon=nodefer $HURONOS_FLAGS
 
 LABEL persistent-nomodeset
-  MENU LABEL ^5. Start contest system (Safe Fallback / nomodeset)
+  MENU LABEL ^5. Start contest system (console-only / nomodeset)
   KERNEL /boot/vmlinuz-6.0.15-huronos+
   APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nomodeset nouveau.modeset=0 modprobe.blacklist=nouveau $HURONOS_FLAGS
 
 LABEL nosync
   MENU LABEL ^6. Start no-sync mode
   KERNEL /boot/vmlinuz-6.0.15-huronos+
-  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 nouveau.modeset=1 nouveau.noaccel=1 i915.force_probe=* $HURONOS_FLAGS
+  APPEND initrd=/boot/initrfs.img load_ramdisk=1 prompt_ramdisk=0 rw consoleblank=0 console=tty0 modprobe.blacklist=i915,nouveau fbcon=nodefer $HURONOS_FLAGS
 EOF
 echo "✓ Updated $CFG_EFI"
 fi
@@ -228,7 +229,7 @@ echo ""
 echo "============================================="
 echo " ✓ UAA Lab & NVIDIA boot configuration successfully applied!"
 echo "============================================="
-echo "1. Configured NVIDIA primary display output (nouveau.modeset=1 nouveau.noaccel=1)."
-echo "2. Enabled Intel Core Ultra fallback (i915.force_probe=*)."
-echo "3. Removed legacy 'vga=normal' and fixed 64-bit EFI menu module."
+echo "1. Made the EFI-framebuffer/fbdev fallback the default (without nomodeset)."
+echo "2. Removed unsupported i915.force_probe=* from all normal boot paths."
+echo "3. Kept experimental nouveau separate, removed vga=normal, and fixed the 64-bit EFI menu module."
 echo ""
