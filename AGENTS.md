@@ -207,12 +207,12 @@ huronOS can be tested locally inside KVM without burning a physical USB:
 
 ## UAA Lab Hardware & NVIDIA Graphics Compatibility
 
-On systems in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories (Dell machines with Intel integrated graphics + dedicated NVIDIA RTX/Ada/GTX cards), huronOS alpha 0.4 requires:
+On systems in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories (e.g. Dell machines with Intel Arrow Lake / dedicated NVIDIA GPUs) where the kernel (Linux 6.0 in huronOS alpha 0.4) lacks KMS drivers:
 
-- **DRM KMS enabled** (without `nomodeset`) so that `/dev/dri/card0` is created for Xorg's `modesetting` driver.
-- **`modprobe.blacklist=nouveau`** to prevent kernel hangs caused by missing firmware for modern NVIDIA architectures.
-- **Native 64-bit EFI menu** (`/EFI/Boot/menu.c32` in `/EFI/Boot/syslinux.cfg`) to ensure UEFI boots without crashing Syslinux EFI.
-- **Removal of `vga=normal`** from kernel parameters.
+- **EFI Framebuffer fallback (`fbdev`)**: huronOS boots with `modprobe.blacklist=i915,nouveau fbcon=nodefer` (without `nomodeset`) and uses Debian's `xserver-xorg-video-fbdev` driver injected into `05-custom.hsl` targeting `/dev/fb0`.
+- **Software rendering**: OpenGL clients use Mesa LLVMpipe (`LIBGL_ALWAYS_SOFTWARE=1`).
+- **Native 64-bit EFI menu**: (`/EFI/Boot/menu.c32` in `/EFI/Boot/syslinux.cfg`) to ensure UEFI boots without crashing Syslinux EFI.
+- **Removal of `vga=normal`**: from kernel parameters.
 
 **Automated script:** `configure-nvidia-boot.sh` automatically updates both `/boot/huronos.cfg` (Legacy BIOS) and `/EFI/Boot/syslinux.cfg` (UEFI) and refreshes checksums.
 
