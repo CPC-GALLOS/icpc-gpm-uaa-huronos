@@ -207,30 +207,34 @@ huronOS can be tested locally inside KVM without burning a physical USB:
 
 ---
 
-## VS Code Extensions Integration (C/C++, CPH, Python & Red Hat Java)
+## VS Code Extensions Integration (C/C++, CPH, Python & Red Hat Java via Offline VSIX)
 
-To provide an optimal competitive programming development environment in huronOS:
+huronOS alpha 0.4 ships with **VSCodium 1.81.1** (August 2023). In contest environments with strict firewalls and older VS Code runtimes, downloading extensions directly from the GUI marketplace fails with download errors. Therefore, all extensions are packaged as **100% offline `.vsix` packages** and pre-injected into the system:
 
-1. **`ms-vscode.cpptools` (C/C++ Tools)**: Pre-packaged in the base ISO as `huronOS/software/programming/vsc-cpptools.hsm` (v1.16.3). Activated via directives `programming/vsc-cpptools`.
+1. **`ms-vscode.cpptools` (C/C++ Tools)**:
+   - Pre-packaged in base ISO as `huronOS/software/programming/vsc-cpptools.hsm` (v1.16.3) and pre-extracted into `05-custom.hsl`.
 2. **`DivyanshuAgrawal.competitive-programming-helper` (CPH)**:
-   - Packaged as `huronOS/software/programming/vsc-cph.hsm` and injected into `05-custom.hsl`.
+   - Package: `competitive-programming-helper-2077.0.0.vsix`.
+   - Directory: `/opt/codium/contestant/extensions/divyanshuagrawal.competitive-programming-helper-2077.0.0/`.
    - Manifest: `/opt/codium/contestant/extensions/ids/vsc-cph.json`.
-   - Files: `/opt/codium/contestant/extensions/DivyanshuAgrawal.competitive-programming-helper-2077.0.0/`.
 3. **`ms-python.python` (Microsoft Python)**:
-   - Packaged as `huronOS/software/programming/vsc-python.hsm` and injected into `05-custom.hsl`.
+   - Package: `ms-python.python-2023.14.0.vsix` (includes offline bundled `jedi-language-server`).
+   - Directory: `/opt/codium/contestant/extensions/ms-python.python-2023.14.0/`.
    - Manifest: `/opt/codium/contestant/extensions/ids/vsc-python.json`.
-   - Files: `/opt/codium/contestant/extensions/ms-python.python-2023.14.0/`.
-   - Compatible with VSCodium 1.81.1 runtime (`engines.vscode: ^1.79.0`).
 4. **`redhat.java` (Language Support for Java by Red Hat)**:
-   - Packaged as `huronOS/software/programming/vsc-java.hsm` and injected into `05-custom.hsl`.
+   - Package: `redhat.java-1.40.0.vsix` (includes offline JDT Language Server for OpenJDK 17).
+   - Directory: `/opt/codium/contestant/extensions/redhat.java-1.40.0/`.
    - Manifest: `/opt/codium/contestant/extensions/ids/vsc-java.json`.
-   - Files: `/opt/codium/contestant/extensions/redhat.java-1.40.0/`.
-   - Standard language server for Java competitive development.
-5. **Runtime Lifecycle**:
-   - On Codium startup, `/usr/bin/codium` generates `/opt/codium/contestant/extensions/extensions.json` containing all extension descriptors in `ids/` and loads them with `--extensions-dir`.
-6. **Scripts**:
-   - `02b-inject-vscode-extensions.sh`: Standalone script to download/unpack all VSIX extensions, generate `.hsm` modules, inject into `05-custom.hsl`, and refresh checksums.
-   - `02-inject-custom-layer.sh`, `01-install-huronos.sh`, `05-test-huronos-vm.sh`: Automatically perform extension injection during installation and VM setup.
+5. **Offline Storage & Manual VSIX Install**:
+   - Copies of all `.vsix` packages are stored in `/opt/codium/vsix/` and `/home/contestant/vsix/`.
+   - Contestants can install via GUI: *Extensions -> ... -> Install from VSIX...*
+   - Admin/CLI helper: `/usr/local/bin/install-vsix-extensions` installs/refreshes all VSIX packages automatically.
+6. **huronOS Module Integration**:
+   - Registered in `/etc/hmm/any` and `/etc/hsync/all_software` (`programming/vsc-cph`, `programming/vsc-python`, `programming/vsc-java`).
+   - Pre-compiled `/opt/codium/contestant/extensions/extensions.json` with permissions `777`.
+7. **Scripts**:
+   - `02b-inject-vscode-extensions.sh`: Standalone injection script for USB, VM, or mounted HURONOS directory.
+   - `02-inject-custom-layer.sh`, `01-install-huronos.sh`, `05-test-huronos-vm.sh`: Automatically perform full extension and wallpaper injection.
 
 ---
 

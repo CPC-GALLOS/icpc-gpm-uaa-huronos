@@ -199,6 +199,22 @@ ln -sf /usr/lib/mesa-diverted "$TMP_LAB/squashfs-root/etc/alternatives/glx"
 ln -sf /usr/lib/xorg/modules/extensions/libglx.so "$TMP_LAB/squashfs-root/etc/alternatives/glx--libglxserver_nvidia.so"
 
 mkdir -p "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/ids"
+mkdir -p "$TMP_LAB/squashfs-root/opt/codium/vsix"
+mkdir -p "$TMP_LAB/squashfs-root/home/contestant/vsix"
+mkdir -p "$TMP_LAB/squashfs-root/usr/local/bin"
+mkdir -p "$TMP_LAB/squashfs-root/etc/hmm"
+mkdir -p "$TMP_LAB/squashfs-root/etc/hsync"
+
+# Extract base ISO vsc-cpptools if present in software directory
+if [ -d "$SOFTWARE_PROG_DIR" ] && [ -f "$SOFTWARE_PROG_DIR/vsc-cpptools.hsm" ]; then
+    echo "Pre-extracting base C/C++ Tools extension into 05-custom.hsl..."
+    CPP_UNPACK="$TMP_LAB/unpack_base_cpptools"
+    mkdir -p "$CPP_UNPACK"
+    unsquashfs -d "$CPP_UNPACK" -f "$SOFTWARE_PROG_DIR/vsc-cpptools.hsm" >/dev/null 2>&1 || true
+    if [ -d "$CPP_UNPACK/opt/codium/contestant/extensions" ]; then
+        cp -rf "$CPP_UNPACK/opt/codium/contestant/extensions/"* "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/" 2>/dev/null || true
+    fi
+fi
 
 declare -a GENERATED_HSMS=()
 
@@ -229,18 +245,27 @@ for ext_spec in "${EXT_CONFIGS[@]}"; do
     fi
 
     if [ -f "$LOCAL_VSIX" ]; then
+        # Copy raw VSIX package for offline installation
+        VSIX_BASENAME="$(basename "$LOCAL_VSIX")"
+        cp -f "$LOCAL_VSIX" "$TMP_LAB/squashfs-root/opt/codium/vsix/$VSIX_BASENAME"
+        cp -f "$LOCAL_VSIX" "$TMP_LAB/squashfs-root/home/contestant/vsix/$VSIX_BASENAME"
+
         UNPACK_DIR="$TMP_LAB/unpack_$MOD_ID"
         mkdir -p "$UNPACK_DIR"
         unzip -q "$LOCAL_VSIX" -d "$UNPACK_DIR"
 
         PKG_JSON="$UNPACK_DIR/extension/package.json"
-        EXT_VERSION=$(grep -o '"version": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "1.0.0")
-        EXT_PUBLISHER=$(grep -o '"publisher": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "custom")
-        EXT_NAME=$(grep -o '"name": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "$DEFAULT_EXT_NAME")
+        RAW_VERSION=$(grep -o '"version": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "1.0.0")
+        RAW_PUBLISHER=$(grep -o '"publisher": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "custom")
+        RAW_NAME=$(grep -o '"name": *"[^"]*"' "$PKG_JSON" 2>/dev/null | head -n 1 | cut -d'"' -f4 || echo "$DEFAULT_EXT_NAME")
 
-        [ -z "$EXT_VERSION" ] && EXT_VERSION="1.0.0"
-        [ -z "$EXT_PUBLISHER" ] && EXT_PUBLISHER="custom"
-        [ -z "$EXT_NAME" ] && EXT_NAME="$DEFAULT_EXT_NAME"
+        [ -z "$RAW_VERSION" ] && RAW_VERSION="1.0.0"
+        [ -z "$RAW_PUBLISHER" ] && RAW_PUBLISHER="custom"
+        [ -z "$RAW_NAME" ] && RAW_NAME="$DEFAULT_EXT_NAME"
+
+        EXT_VERSION="$RAW_VERSION"
+        EXT_PUBLISHER=$(echo "$RAW_PUBLISHER" | tr '[:upper:]' '[:lower:]')
+        EXT_NAME=$(echo "$RAW_NAME" | tr '[:upper:]' '[:lower:]')
 
         FULL_EXT_ID="${EXT_PUBLISHER}.${EXT_NAME}"
         EXT_DIR_NAME="${FULL_EXT_ID}-${EXT_VERSION}"
@@ -279,6 +304,159 @@ EOF
         fi
     fi
 done
+
+# Pre-compile extensions.json in custom layer
+echo "Compiling extensions.json registry for VSCodium..."
+EXT_JSON_FILE="$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/extensions.json"
+echo -n "[" > "$EXT_JSON_FILE"
+FIRST_ENTRY=true
+for id_file in "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/ids/"*.json; do
+    if [ -f "$id_file" ]; then
+        if [ "$FIRST_ENTRY" = true ]; then
+            FIRST_ENTRY=false
+        else
+            echo -n "," >> "$EXT_JSON_FILE"
+        fi
+        tr -d '\n' < "$id_file" >> "$EXT_JSON_FILE"
+    fi
+done
+echo "]" >> "$EXT_JSON_FILE"
+
+# Provide offline VSIX installation helper script
+cat << 'EOF' > "$TMP_LAB/squashfs-root/usr/local/bin/install-vsix-extensions"
+#!/bin/bash
+# install-vsix-extensions — Install/reinstall all offline VSIX packages into Codium
+EXT_DIR="/opt/codium/contestant/extensions"
+mkdir -p "$EXT_DIR" 2>/dev/null || true
+echo "Installing offline VSIX extensions into $EXT_DIR..."
+for vsix in /opt/codium/vsix/*.vsix /home/contestant/vsix/*.vsix; do
+    if [ -f "$vsix" ]; then
+        echo "  -> Installing $(basename "$vsix")..."
+        /usr/share/codium/bin/codium --extensions-dir "$EXT_DIR" --install-extension "$vsix" || true
+    fi
+done
+echo "✓ All offline VSIX extensions processed."
+EOF
+chmod 755 "$TMP_LAB/squashfs-root/usr/local/bin/install-vsix-extensions"
+
+# Register extensions in huronOS module lists
+if [ ! -f "$TMP_LAB/squashfs-root/etc/hmm/any" ]; then
+    cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/hmm/any"
+HURONDIR=/run/initramfs/memory/system/huronOS/software/
+debuggers/ddd                               false
+debuggers/gdb                               false
+debuggers/valgrind                          false
+debuggers/visualvm                          false
+internet/chromium                           false
+internet/crow                               false
+internet/firefox                            false
+langs/dotnet                                false
+langs/g++                                   false
+langs/gcc                                   false
+langs/javac                                 false
+langs/kotlinc                               false
+langs/mono                                  false
+langs/pypy3                                 false
+langs/python3                               false
+langs/ruby                                  false
+tools/byobu                                 false
+tools/konsole                               false
+tools/midnight-commander                    false
+programming/atom                            false
+programming/clion                           false
+programming/codeblocks                      false
+programming/eclipse                         false
+programming/emacs                           false
+programming/geany                           false
+programming/gedit                           false
+programming/gvim                            false
+programming/intellij                        false
+programming/joe                             false
+programming/kate                            false
+programming/kdevelop                        false
+programming/neovim                          false
+programming/pycharm                         false
+programming/rider                           false
+programming/sublime                         false
+programming/vim                             false
+programming/vscode                          false
+programming/vsc-clangd                      false
+programming/vsc-cpp-compile-run             false
+programming/vsc-cpptools                    false
+programming/vsc-intellij-idea-keybindings   false
+programming/vsc-vscodevim                   false
+programming/vsc-cph                         false
+programming/vsc-python                      false
+programming/vsc-java                        false
+EOF
+else
+    for mod in "programming/vsc-cph" "programming/vsc-python" "programming/vsc-java"; do
+        if ! grep -q "$mod" "$TMP_LAB/squashfs-root/etc/hmm/any"; then
+            printf "%-43s false\n" "$mod" >> "$TMP_LAB/squashfs-root/etc/hmm/any"
+        fi
+    done
+fi
+
+if [ ! -f "$TMP_LAB/squashfs-root/etc/hsync/all_software" ]; then
+    cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/hsync/all_software"
+debuggers/ddd
+debuggers/gdb
+debuggers/valgrind
+debuggers/visualvm
+internet/chromium
+internet/crow
+internet/firefox
+langs/dotnet
+langs/g++
+langs/gcc
+langs/javac
+langs/kotlinc
+langs/mono
+langs/pypy3
+langs/python3
+langs/ruby
+tools/byobu
+tools/konsole
+tools/midnight-commander
+programming/atom
+programming/clion
+programming/codeblocks
+programming/eclipse
+programming/emacs
+programming/geany
+programming/gedit
+programming/gvim
+programming/intellij
+programming/joe
+programming/kate
+programming/kdevelop
+programming/neovim
+programming/pycharm
+programming/rider
+programming/sublime
+programming/vim
+programming/vscode
+programming/vsc-clangd
+programming/vsc-cpp-compile-run
+programming/vsc-cpptools
+programming/vsc-intellij-idea-keybindings
+programming/vsc-vscodevim
+programming/vsc-cph
+programming/vsc-python
+programming/vsc-java
+EOF
+else
+    for mod in "programming/vsc-cph" "programming/vsc-python" "programming/vsc-java"; do
+        if ! grep -q "$mod" "$TMP_LAB/squashfs-root/etc/hsync/all_software"; then
+            echo "$mod" >> "$TMP_LAB/squashfs-root/etc/hsync/all_software"
+        fi
+    done
+fi
+
+# Ensure permissive access for contestant user
+chmod -R 777 "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions" 2>/dev/null || true
+chmod -R 755 "$TMP_LAB/squashfs-root/opt/codium/vsix" 2>/dev/null || true
+chmod -R 777 "$TMP_LAB/squashfs-root/home/contestant/vsix" 2>/dev/null || true
 
 echo "Building updated 05-custom.hsl squashfs layer..."
 rm -f "$TMP_LAB/05-custom.hsl"

@@ -175,22 +175,27 @@ bash 05-test-huronos-vm.sh
 
 ---
 
-## Extensiones de Visual Studio Code (C/C++, CPH, Python & Java)
+## Extensiones de Visual Studio Code (C/C++, CPH, Python & Java vía VSIX Offline)
 
-Para optimizar el flujo de trabajo de los competidores durante el ICPC, huronOS incluye y activa las siguientes extensiones:
+Debido a que huronOS opera en entornos de concurso aislados y con **VSCodium 1.81.1**, las descargas directas desde la tienda gráfica online fallan con errores de descarga o incompatibilidad de API. Por ello, todas las extensiones requeridas se empaquetan y suministran **100% offline mediante paquetes `.vsix` compatibles**:
 
-| Extensión | Identificador / Módulo | Funcionalidad |
-| --- | --- | --- |
-| **C/C++ Tools** (`ms-vscode.cpptools`) | `programming/vsc-cpptools` | Autocompletado IntelliSense, navegación de código, resaltado de sintaxis y formateo con `clang-format`. |
-| **Competitive Programming Helper** (`DivyanshuAgrawal.competitive-programming-helper`) | `programming/vsc-cph` | Gestión de casos de prueba, ejecución rápida de soluciones, vista de diferencias (diff) y soporte multilingüe (C++, Java, Python, Kotlin). |
-| **Microsoft Python** (`ms-python.python`) | `programming/vsc-python` | Soporte de autocompletado, linting y ejecución de scripts en Python 3 para desarrollo competitivo. |
-| **Language Support for Java™ by Red Hat** (`redhat.java`) | `programming/vsc-java` | Soporte completo de lenguaje Java (Java 17/21), navegación y resolución de tipos para ICPC. |
+| Extensión | Identificador / Módulo | Paquete VSIX | Funcionalidad |
+| --- | --- | --- | --- |
+| **C/C++ Tools** (`ms-vscode.cpptools`) | `programming/vsc-cpptools` | *Nativo en ISO* (v1.16.3) | Autocompletado IntelliSense, navegación de código, resaltado de sintaxis y formateo con `clang-format`. |
+| **Competitive Programming Helper** (`divyanshuagrawal.competitive-programming-helper`) | `programming/vsc-cph` | `competitive-programming-helper-2077.0.0.vsix` | Gestión de casos de prueba, ejecución rápida de soluciones, vista de diferencias (diff) y soporte multilingüe (C++, Java, Python, Kotlin). |
+| **Microsoft Python** (`ms-python.python`) | `programming/vsc-python` | `ms-python.python-2023.14.0.vsix` | Soporte de autocompletado con `jedi-language-server` offline y ejecución de Python 3 para desarrollo competitivo. |
+| **Language Support for Java™ by Red Hat** (`redhat.java`) | `programming/vsc-java` | `redhat.java-1.40.0.vsix` | Soporte completo de lenguaje Java (OpenJDK 17), servidor JDT Language Server offline, navegación y resolución de tipos. |
 
-### Integración en huronOS
-1. **Directivas:** Se agregan `programming/vsc-cpptools`, `programming/vsc-cph`, `programming/vsc-python` y `programming/vsc-java` a `AvailableSoftware` en `icpc-gpm-2026-3rd-date.hdf`.
-2. **Capa `05-custom.hsl`:** Todas las extensiones se pre-inyectan en `/opt/codium/contestant/extensions/` junto con sus descriptores en `ids/vsc-*.json`.
-3. **Módulos HSM:** Se generan los módulos `vsc-cph.hsm`, `vsc-python.hsm` y `vsc-java.hsm` en `huronOS/software/programming/`.
-4. **Carga Dinámica:** El lanzador `/usr/bin/codium` compila automáticamente `/opt/codium/contestant/extensions/extensions.json` combinando todos los descriptores en cada sesión.
+### Integración y Métodos de Instalación Offline
+
+1. **Pre-instaladas en el Sistema (`05-custom.hsl`):** Todas las extensiones se encuentran pre-extraídas y activas en `/opt/codium/contestant/extensions/` junto con sus manifiestos `ids/vsc-*.json` y `extensions.json` precompilado.
+2. **Paquetes VSIX de Respaldo:** Copias originales de los archivos `.vsix` están disponibles en `/opt/codium/vsix/` y `/home/contestant/vsix/`.
+3. **Instalación Manual Gráfica:** Desde Codium: `Extensions` -> Menú de tres puntos `...` -> **Install from VSIX...** seleccionando cualquier archivo de `/home/contestant/vsix/`.
+4. **Comando de Restauración Rápida:** En terminal basta con ejecutar:
+   ```bash
+   install-vsix-extensions
+   ```
+5. **Registro en huronOS:** Declaradas en las directivas (`AvailableSoftware`), en `/etc/hmm/any` y en `/etc/hsync/all_software` para interoperabilidad con el gestor `hmm`.
 
 ---
 
