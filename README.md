@@ -188,14 +188,14 @@ Debido a que huronOS opera en entornos de concurso aislados y con **VSCodium 1.8
 
 ### Integración y Métodos de Instalación Offline
 
-1. **Pre-instaladas en el Sistema (`05-custom.hsl`):** Todas las extensiones se encuentran pre-extraídas y activas en `/opt/codium/contestant/extensions/` junto con sus manifiestos `ids/vsc-*.json` y `extensions.json` precompilado.
+1. **Pre-instaladas en el Sistema (`05-custom.hsl`):** Todas las extensiones se encuentran pre-extraídas y activas en `/opt/codium/contestant/extensions/` junto con sus manifiestos `ids/vsc-*.json` y `extensions.json` precompilado. Los directorios tienen permisos `777`: es necesario porque el wrapper de Codium reconstruye `extensions.json` al iniciar como el usuario `contestant`.
 2. **Paquetes VSIX de Respaldo:** Copias originales de los archivos `.vsix` están disponibles en `/opt/codium/vsix/` y `/home/contestant/vsix/`.
 3. **Instalación Manual Gráfica:** Desde Codium: `Extensions` -> Menú de tres puntos `...` -> **Install from VSIX...** seleccionando cualquier archivo de `/home/contestant/vsix/`.
 4. **Comando de Restauración Rápida:** En terminal basta con ejecutar:
    ```bash
    install-vsix-extensions
    ```
-5. **Registro en huronOS:** Declaradas en las directivas (`AvailableSoftware`), en `/etc/hmm/any` y en `/etc/hsync/all_software` para interoperabilidad con el gestor `hmm`.
+5. **Registro en huronOS:** Declaradas en las directivas (`AvailableSoftware`), en `/etc/hmm/any` y en `/etc/hsync/all_software` para interoperabilidad con el gestor `hmm`. Los módulos `.hsm` generados conservan esos permisos; esto es importante porque `hsync` los monta por encima de `05-custom.hsl`.
 
 ---
 

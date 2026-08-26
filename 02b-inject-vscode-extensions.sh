@@ -217,6 +217,11 @@ for ext_spec in "${EXT_CONFIGS[@]}"; do
 {"identifier":{"id":"${FULL_EXT_ID}"},"version":"${EXT_VERSION}","location":{"\$mid":1,"fsPath":"/opt/codium/contestant/extensions/${EXT_DIR_NAME}","external":"file:///opt/codium/contestant/extensions/${EXT_DIR_NAME}","path":"/opt/codium/contestant/extensions/${EXT_DIR_NAME}","scheme":"file"},"relativeLocation":"${EXT_DIR_NAME}","metadata":{"installedTimestamp":${NOW_MS}}}
 EOF
 
+    # hsync mounts this .hsm above 05-custom.hsl.  The Codium wrapper writes
+    # extensions.json at every start, so its topmost extensions directory must
+    # remain writable by the unprivileged contestant user as well.
+    chmod -R 777 "$EXT_ROOT/opt/codium/contestant/extensions"
+
     # Copy into layer root
     mkdir -p "$LAYER_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME"
     cp -rf "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/"* "$LAYER_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/"
@@ -258,13 +263,15 @@ echo "]" >> "$EXT_JSON_FILE"
 cat << 'EOF' > "$LAYER_ROOT/usr/local/bin/install-vsix-extensions"
 #!/bin/bash
 # install-vsix-extensions — Install/reinstall all offline VSIX packages into Codium
+set -e
+
 EXT_DIR="/opt/codium/contestant/extensions"
 mkdir -p "$EXT_DIR" 2>/dev/null || true
 echo "Installing offline VSIX extensions into $EXT_DIR..."
 for vsix in /opt/codium/vsix/*.vsix /home/contestant/vsix/*.vsix; do
     if [ -f "$vsix" ]; then
         echo "  -> Installing $(basename "$vsix")..."
-        /usr/share/codium/bin/codium --extensions-dir "$EXT_DIR" --install-extension "$vsix" || true
+        /usr/share/codium/bin/codium --extensions-dir "$EXT_DIR" --install-extension "$vsix"
     fi
 done
 echo "✓ All offline VSIX extensions processed."
