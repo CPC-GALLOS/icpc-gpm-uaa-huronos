@@ -43,38 +43,59 @@ MOUNTED_BY_US=false
 TARGET_DIR=""
 
 if [ -z "$TARGET" ]; then
-    echo "Searching for partition with label 'HURONOS'..."
-    DEV_CANDIDATE=$(blkid -L HURONOS 2>/dev/null || true)
-    if [ -n "$DEV_CANDIDATE" ]; then
-        TARGET="$DEV_CANDIDATE"
-        echo "Found huronOS partition: $TARGET"
+    ALREADY_MOUNTED=$(findmnt -n -o TARGET -S LABEL=HURONOS 2>/dev/null || true)
+    if [ -n "$ALREADY_MOUNTED" ]; then
+        TARGET_DIR="$ALREADY_MOUNTED"
+        echo "Found mounted huronOS partition at: $TARGET_DIR"
     else
-        echo "❌ Error: No target specified and no partition labeled 'HURONOS' found."
-        echo "Usage: sudo bash $0 [/dev/sdX1 | /path/to/mounted/huronOS] [wallpaper.png]"
+        echo "Searching for partition with label 'HURONOS'..."
+        DEV_CANDIDATE=$(blkid -L HURONOS 2>/dev/null || true)
+        if [ -n "$DEV_CANDIDATE" ]; then
+            TARGET="$DEV_CANDIDATE"
+            echo "Found huronOS partition: $TARGET"
+        else
+            echo "❌ Error: No target specified and no partition labeled 'HURONOS' found."
+            echo "Usage: bash $0 [/dev/sdX1 | /path/to/mounted/huronOS] [wallpaper.png]"
+            exit 1
+        fi
+    fi
+fi
+
+if [ -z "$TARGET_DIR" ]; then
+    if [ -b "$TARGET" ]; then
+        EXISTING_MNT=$(findmnt -n -o TARGET "$TARGET" 2>/dev/null || true)
+        if [ -n "$EXISTING_MNT" ]; then
+            TARGET_DIR="$EXISTING_MNT"
+            echo "Using existing mount point: $TARGET_DIR"
+        elif command -v udisksctl &>/dev/null && UDISKS_OUT=$(udisksctl mount -b "$TARGET" 2>/dev/null); then
+            TARGET_DIR=$(echo "$UDISKS_OUT" | grep -o 'at /.*' | sed 's/at //')
+            echo "Mounted via udisksctl to: $TARGET_DIR"
+            MOUNTED_BY_US=true
+        else
+            TARGET_DIR="/tmp/huronos-inject-mnt-$$"
+            mkdir -p "$TARGET_DIR"
+            echo "Mounting $TARGET to $TARGET_DIR..."
+            mount "$TARGET" "$TARGET_DIR"
+            MOUNTED_BY_US=true
+        fi
+    elif [ -d "$TARGET" ]; then
+        TARGET_DIR="$TARGET"
+    else
+        echo "❌ Error: Target '$TARGET' is neither a block device nor a directory."
         exit 1
     fi
 fi
 
-if [ -b "$TARGET" ]; then
-    # It's a block device (e.g. /dev/sdb1)
-    TARGET_DIR="/tmp/huronos-inject-mnt-$$"
-    mkdir -p "$TARGET_DIR"
-    echo "Mounting $TARGET to $TARGET_DIR..."
-    mount "$TARGET" "$TARGET_DIR"
-    MOUNTED_BY_US=true
-elif [ -d "$TARGET" ]; then
-    TARGET_DIR="$TARGET"
-else
-    echo "❌ Error: Target '$TARGET' is neither a block device nor a directory."
-    exit 1
-fi
-
 cleanup() {
-    if [ "$MOUNTED_BY_US" = true ] && mountpoint -q "$TARGET_DIR" 2>/dev/null; then
-        echo "Unmounting $TARGET_DIR..."
+    if [ "$MOUNTED_BY_US" = true ]; then
+        echo "Syncing and unmounting $TARGET_DIR..."
         sync
-        umount "$TARGET_DIR" || true
-        rm -rf "$TARGET_DIR"
+        if [ -b "$TARGET" ] && command -v udisksctl &>/dev/null && mountpoint -q "$TARGET_DIR" 2>/dev/null; then
+            udisksctl unmount -b "$TARGET" 2>/dev/null || umount "$TARGET_DIR" 2>/dev/null || true
+        elif mountpoint -q "$TARGET_DIR" 2>/dev/null; then
+            umount "$TARGET_DIR" || true
+        fi
+        rm -rf "/tmp/huronos-inject-mnt-$$" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT INT TERM
@@ -115,13 +136,40 @@ echo "Injecting wallpaper as /usr/share/backgrounds/huronos-background.png..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/backgrounds"
 cp -f "$WALLPAPER_SRC" "$TMP_LAB/squashfs-root/usr/share/backgrounds/huronos-background.png"
 
+echo "Injecting universal Xorg display configuration into 05-custom.hsl..."
+mkdir -p "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d"
+mkdir -p "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d"
+mkdir -p "$TMP_LAB/squashfs-root/etc/alternatives"
+
+# 1. Provide universal modesetting/fallback screen configuration
+cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-modesetting.conf"
+Section "Device"
+    Identifier "Card0"
+    Driver "modesetting"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device "Card0"
+EndSection
+EOF
+
+# 2. Disable conflicting NVIDIA proprietary output class
+cat << 'EOF' > "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d/nvidia-drm-outputclass.conf"
+# Disabled for universal Intel/AMD/NVIDIA open-source compatibility
+EOF
+
+# 3. Ensure GLX points to Mesa universal driver
+ln -sf /usr/lib/mesa-diverted "$TMP_LAB/squashfs-root/etc/alternatives/glx"
+ln -sf /usr/lib/xorg/modules/extensions/libglx.so "$TMP_LAB/squashfs-root/etc/alternatives/glx--libglxserver_nvidia.so"
+
 echo "Building updated 05-custom.hsl squashfs layer..."
 rm -f "$TMP_LAB/05-custom.hsl"
 mksquashfs "$TMP_LAB/squashfs-root" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -always-use-fragments -noappend >/dev/null
 
 cp -f "$TMP_LAB/05-custom.hsl" "$CUSTOM_HSL"
 rm -rf "$TMP_LAB"
-echo "✓ Updated $CUSTOM_HSL"
+echo "✓ Updated $CUSTOM_HSL (with wallpaper + universal Xorg/Mesa fix)"
 
 # 5. Pre-seed wallpaper in huronOS/data/backups/
 mkdir -p "$DATA_BACKUPS_DIR"

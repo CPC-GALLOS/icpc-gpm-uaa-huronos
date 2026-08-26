@@ -149,21 +149,25 @@ sudo ./inject-wallpaper.sh /media/user/HURONOS custom-wallpaper.png
 5. Select the USB to boot from.
 6. huronOS automatically boots to the contestant desktop.
 
-### NVIDIA Dedicated GPUs & Safe Graphics
+### UAA Lab Hardware & NVIDIA Graphics Compatibility
 
-If your computer uses a dedicated NVIDIA graphics card without integrated graphics (iGPU), standard `nouveau` drivers can occasionally cause a black screen during boot.
+Computers in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories (Dell systems with Intel CPU + dedicated NVIDIA RTX/Ada/GTX graphics) require specific boot options to avoid GPU hangs and ensure the `modesetting` Xorg display manager starts properly.
 
-To configure your USB for NVIDIA compatibility:
+To configure your USB for UAA lab computers and NVIDIA graphics:
 
 ```bash
-# Auto-detects partition labeled HURONOS and configures 'nomodeset':
+# Auto-detects partition labeled HURONOS and applies optimal lab configuration:
 bash configure-nvidia-boot.sh
 
 # Or specify the partition directly:
 bash configure-nvidia-boot.sh /dev/sdX1
 ```
 
-This adds `nomodeset nouveau.modeset=0` to the kernel boot parameters and updates system checksums automatically.
+This configuration:
+- Enables **DRM KMS modesetting** (keeping `/dev/dri/card0` active for Intel/modesetting display drivers).
+- Blacklists `nouveau` (`modprobe.blacklist=nouveau`) to prevent kernel hangs on modern NVIDIA RTX/Ada architectures lacking open-source firmware in the base kernel.
+- Removes legacy `vga=normal` and configures the native 64-bit EFI menu module (`/EFI/Boot/menu.c32`).
+- Updates bootloader checksums automatically.
 
 ---
 

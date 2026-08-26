@@ -205,12 +205,16 @@ huronOS can be tested locally inside KVM without burning a physical USB:
 
 ---
 
-## NVIDIA Dedicated GPU Compatibility
+## UAA Lab Hardware & NVIDIA Graphics Compatibility
 
-On systems with only dedicated NVIDIA graphics cards (no integrated GPU / iGPU), huronOS's default open-source `nouveau` driver can cause kernel hangs or a black screen.
+On systems in the **Universidad Autónoma de Aguascalientes (UAA)** contest laboratories (Dell machines with Intel integrated graphics + dedicated NVIDIA RTX/Ada/GTX cards), huronOS alpha 0.4 requires:
 
-- **Solution:** Add `nomodeset nouveau.modeset=0` to the kernel parameters in `/boot/huronos.cfg`.
-- **Automated script:** `configure-nvidia-boot.sh` mounts the HURONOS partition, updates `boot/huronos.cfg`, and refreshes the checksum in `checksums`.
+- **DRM KMS enabled** (without `nomodeset`) so that `/dev/dri/card0` is created for Xorg's `modesetting` driver.
+- **`modprobe.blacklist=nouveau`** to prevent kernel hangs caused by missing firmware for modern NVIDIA architectures.
+- **Native 64-bit EFI menu** (`/EFI/Boot/menu.c32` in `/EFI/Boot/syslinux.cfg`) to ensure UEFI boots without crashing Syslinux EFI.
+- **Removal of `vga=normal`** from kernel parameters.
+
+**Automated script:** `configure-nvidia-boot.sh` automatically updates both `/boot/huronos.cfg` (Legacy BIOS) and `/EFI/Boot/syslinux.cfg` (UEFI) and refreshes checksums.
 
 ---
 
