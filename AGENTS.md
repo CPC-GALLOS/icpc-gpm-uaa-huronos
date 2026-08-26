@@ -183,13 +183,14 @@ Key settings:
 ---
 
 ## Testing with KVM / virt-manager
-
-huronOS can be tested locally inside KVM without burning a physical USB:
-
-- **Automated setup script:** `05-test-huronos-vm.sh`
-- **Method:** Creates a 16 GiB raw disk image (`huronos-vm-disk.img`), attaches it as a loop device (`/dev/loopN`), runs `install.sh` from the ISO onto the loop device, and launches `virt-install`.
-- **Boot mode:** SeaBIOS (BIOS/MBR legacy boot) — DO NOT use OVMF/UEFI as huronOS uses extlinux.
-- **Physical USB passthrough:** A physical USB created with `01-install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager`.
+ 
+ huronOS can be tested locally inside KVM without burning a physical USB:
+ 
+ - **Automated setup script (Virtual Disk Image):** `05-test-huronos-vm.sh`
+   - **Method:** Creates a 16 GiB raw disk image (`huronos-vm-disk.img`), attaches it as a loop device (`/dev/loopN`), runs `install.sh` from the ISO onto the loop device, and launches `virt-install`.
+ - **Physical USB passthrough script:** `06-test-huronos-usb-vm.sh` (e.g. `bash 06-test-huronos-usb-vm.sh /dev/sdb`).
+ - **Boot mode:** SeaBIOS (BIOS/MBR legacy boot) — DO NOT use OVMF/UEFI as huronOS uses extlinux.
+ - **Physical USB passthrough:** A physical USB created with `01-install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager` or directly via `06-test-huronos-usb-vm.sh`.
 
 ---
 
@@ -251,13 +252,23 @@ On systems in the **Universidad Autónoma de Aguascalientes (UAA)** contest labo
 
 ---
 
+## Network Management & IEEE 802.1X / Enterprise Wi-Fi (ConnMan)
+
+huronOS uses **ConnMan** (`cmst`) for networking.
+- **WPA-Enterprise limitation:** ConnMan's simple tray GUI cannot prompt interactively for EAP (PEAP/MSCHAPv2) authentication credentials when selecting 802.1X networks such as `RIUAA` (UAA campus Wi-Fi) or `eduroam`. It produces the error:
+  `"Failed to toggle connection state. IEEE8021x secured services have to be manually configured."`
+- **Official Contest Recommendation:** Use wired Ethernet (`eth0` / `enp*`), which connects automatically via DHCP without authentication prompt issues.
+- **Manual Wi-Fi Provisioning:** Configured by placing `.config` files under `/var/lib/connman/` (e.g. `/var/lib/connman/riuaa.config`) specifying `Type=wifi`, `Name=RIUAA`, `EAP=peap`, `Phase2=MSCHAPV2`, `Identity=...`, and `Passphrase=...`, then running `sudo systemctl restart connman`.
+
+---
+
 ## Development Guidelines: Shell Script Quality & ShellCheck
 
 > [!IMPORTANT]
 > **Mandatory verification:** Any modified or newly created shell script (`*.sh`) in this repository **must always be verified with `shellcheck`**:
 >
 > ```bash
-> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh
+> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh
 > ```
 >
 > All scripts in this repo must pass `shellcheck` with zero errors and zero warnings before committing.

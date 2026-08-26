@@ -20,6 +20,7 @@ icpc-gpm-uaa-huronos/
 ├── 03-configure-nvidia-boot.sh         # [Paso 3] Ajuste de bootloader para hardware 2024 y GPUs NVIDIA
 ├── 04-update-directives-wallpaper.sh   # [Utilidad] Calcula SHA256 de fondos y actualiza archivos .hdf
 ├── 05-test-huronos-vm.sh               # [Pruebas] Creación y prueba local en Máquina Virtual KVM / virt-manager
+├── 06-test-huronos-usb-vm.sh           # [Pruebas] Arranque directo de memoria USB física en KVM / virt-viewer
 ├── competitive-programming-helper-*.vsix # Paquete de extensión CPH para VS Code
 ├── huronos-wallpaper.png               # Wallpaper oficial personalizado para el concurso (1920×1080)
 ├── *.hdf                               # Archivos de directivas por concurso
@@ -169,9 +170,14 @@ sudo bash 03-configure-nvidia-boot.sh /dev/sdX1
 ```
 
 #### Paso 5: Pruebas en Máquina Virtual Local (KVM / virt-manager)
-```bash
-bash 05-test-huronos-vm.sh
-```
+- Probar con imagen de disco virtual:
+  ```bash
+  bash 05-test-huronos-vm.sh
+  ```
+- Probar directamente desde la USB física (ej. `/dev/sdb`):
+  ```bash
+  bash 06-test-huronos-usb-vm.sh /dev/sdb
+  ```
 
 ---
 
@@ -210,11 +216,86 @@ Debido a que huronOS opera en entornos de concurso aislados y con **VSCodium 1.8
 
 ---
 
+## Redes y Conectividad: Wi-Fi Empresarial (WPA-Enterprise / IEEE 802.1X)
+
+### Diagnóstico del Error en Redes Institucionales (`RIUAA` / `eduroam`)
+
+Al intentar conectarse desde la interfaz gráfica de huronOS (applet de red en la bandeja del sistema) a redes inalámbricas con seguridad **WPA-Enterprise / 802.1X** (como la red institucional **`RIUAA`** de la UAA o **`eduroam`**), el sistema muestra el siguiente error:
+
+> **"Failed to toggle connection state. IEEE8021x secured services have to be manually configured."**
+
+### ¿Por qué ocurre?
+huronOS utiliza **ConnMan** como demonio y gestor de conexiones de red. A diferencia de NetworkManager, el applet gráfico ligero de ConnMan no cuenta con un asistente interactivo para solicitar métodos de autenticación EAP avanzados (como PEAP, TTLS, MSCHAPv2 o certificados de usuario) directamente al hacer clic sobre el SSID en la lista.
+
+### Opciones y Soluciones
+
+#### 1. Opción Recomendada para el Concurso: Conexión Cableada (Ethernet)
+En los laboratorios de cómputo de la sede UAA, todas las estaciones de trabajo deben conectarse mediante **cable de red Ethernet (LAN)**.
+- huronOS detecta y configura automáticamente la interfaz cableada mediante DHCP.
+- Es la opción oficial, más rápida, estable y libre de problemas de autenticación o interferencias de radiofrecuencia.
+
+#### 2. Alternativa Inalámbrica Rápida: Zona Wi-Fi Portátil (Hotspot WPA-PSK)
+Si se requiere conexión inalámbrica durante etapas de pruebas o preparación:
+- Compartir datos desde un teléfono móvil o router portátil con seguridad estándar **WPA2-Personal (WPA-PSK)**.
+- Este tipo de red sí solicita la contraseña directamente en el diálogo gráfico simple de huronOS.
+
+#### 3. Configuración Manual de ConnMan para WPA-Enterprise (`RIUAA` / `eduroam`)
+Si es estrictamente necesario conectarse a `RIUAA` o `eduroam` por Wi-Fi, se debe crear un archivo de aprovisionamiento de servicio en `/var/lib/connman/`:
+
+1. Abrir una terminal (`Konsole` o `Ctrl+Alt+T`) y crear el archivo con permisos de superusuario:
+   ```bash
+   sudo nano /var/lib/connman/riuaa.config
+   ```
+
+2. Agregar la configuración correspondiente según la red:
+
+   **Para red `RIUAA` (UAA):**
+   ```ini
+   [global]
+   Description = Red Universitaria RIUAA
+
+   [service_riuaa]
+   Type = wifi
+   Name = RIUAA
+   EAP = peap
+   Phase2 = MSCHAPV2
+   Identity = TU_ID_O_CORREO_INSTITUCIONAL
+   Passphrase = TU_CONTRASENA_INSTITUCIONAL
+   ```
+
+   **Para red `eduroam`:**
+   ```ini
+   [global]
+   Description = Red Academica eduroam
+
+   [service_eduroam]
+   Type = wifi
+   Name = eduroam
+   EAP = peap
+   Phase2 = MSCHAPV2
+   Identity = usuario@institucion.edu.mx
+   Passphrase = TU_CONTRASENA
+   ```
+
+3. Guardar el archivo (`Ctrl+O`, `Enter`) y salir (`Ctrl+X`).
+4. Reiniciar el servicio de ConnMan para aplicar los cambios:
+   ```bash
+   sudo systemctl restart connman
+   ```
+   ConnMan reconocerá el servicio aprovisionado y se conectará automáticamente a la red institucional.
+5. Verificar el estado de la conexión:
+   ```bash
+   connmanctl services
+   ping -c 3 moj.naquadah.com.br
+   ```
+
+---
+
 ## Pruebas de Desarrollo y Calidad (ShellCheck)
 
 De acuerdo con las directrices de calidad del repositorio, todos los scripts deben verificarse con `shellcheck`:
 
 ```bash
-shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh
+shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh
 ```
 *Garantía de calidad: 0 errores y 0 advertencias.*
