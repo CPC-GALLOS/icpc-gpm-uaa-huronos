@@ -2,7 +2,7 @@
 
 Installation and configuration of [huronOS](https://huronos.org) for the **Universidad Autónoma de Aguascalientes** teams at the **Gran Premio de México** (ICPC Region Mexico).
 
-- 🏆 **Judge:** [boca.icpcmexico.org](https://boca.icpcmexico.org)
+- 🏆 **Judge:** [MOJ](https://moj.naquadah.com.br) | [Ensaio](https://ensaio-times-2026.moj.naquadah.com.br/) | [Guía del competidor](https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en)
 - 💿 **ISO:** huronOS alpha 0.4 amd64
 
 ---
@@ -12,6 +12,7 @@ Installation and configuration of [huronOS](https://huronos.org) for the **Unive
 ```text
 icpc-gpm-uaa-huronos/
 ├── install-huronos.sh              # Installation script for USB drive (with custom wallpaper)
+├── configure-nvidia-boot.sh        # Configures bootloader for NVIDIA GPU compatibility (nomodeset)
 ├── test-huronos-vm.sh              # Automated KVM / virt-manager test script
 ├── inject-wallpaper.sh             # Injects wallpaper into 05-custom.hsl & USB/VM partitions
 ├── update-directives-wallpaper.sh  # Calculates SHA256 of custom wallpaper & updates .hdf
@@ -141,11 +142,28 @@ sudo ./inject-wallpaper.sh /media/user/HURONOS custom-wallpaper.png
 
 ## Boot
 
-1. Plug in the USB and start the machine
-2. Enter the boot menu (F12 / F2 / Del)
-3. **Disable Secure Boot** if using UEFI
-4. Select the USB to boot from
-5. huronOS automatically boots to the contestant desktop
+1. Plug in the USB and start the machine.
+2. If your PC **only has a dedicated NVIDIA GPU** (no integrated GPU / iGPU), ensure the monitor cable is plugged into the **NVIDIA graphics card ports**, not the motherboard.
+3. Enter the boot menu (F12 / F11 / F8 / F2 / Del).
+4. **Disable Secure Boot** if using UEFI.
+5. Select the USB to boot from.
+6. huronOS automatically boots to the contestant desktop.
+
+### NVIDIA Dedicated GPUs & Safe Graphics
+
+If your computer uses a dedicated NVIDIA graphics card without integrated graphics (iGPU), standard `nouveau` drivers can occasionally cause a black screen during boot.
+
+To configure your USB for NVIDIA compatibility:
+
+```bash
+# Auto-detects partition labeled HURONOS and configures 'nomodeset':
+bash configure-nvidia-boot.sh
+
+# Or specify the partition directly:
+bash configure-nvidia-boot.sh /dev/sdX1
+```
+
+This adds `nomodeset nouveau.modeset=0` to the kernel boot parameters and updates system checksums automatically.
 
 ---
 

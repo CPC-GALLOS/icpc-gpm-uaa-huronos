@@ -9,7 +9,7 @@ This file provides context about huronOS and this repository for AI assistants h
 This repo contains the installation script and directives configuration to deploy **huronOS alpha 0.4** for the **ICPC Gran Premio de México 2026 – Tercera Fecha** at **Universidad Autónoma de Aguascalientes**.
 
 - Contest date: August 29, 2026, 11:00–16:00 CST (UTC-6, America/Mexico_City)
-- Judge system: BOCA at <https://boca.icpcmexico.org>
+- Judge system: MOJ (<https://moj.naquadah.com.br> & <https://ensaio-times-2026.moj.naquadah.com.br/>)
 - ISO: `huronOS-alpha-0.4-amd64.iso` (not tracked in git — MD5: `9ad2afe4980965c8b6b92fa00b8813d5`, SHA256: `b9d530bc7e5b862de9e20c6ce1690ab90f993c6bfa7b44655234708f4e06b2e9`)
 
 ---
@@ -174,9 +174,9 @@ Key settings:
 - Contest window: `2026-08-29T11:00:00` → `2026-08-29T16:00:00`
 - Config expires: `2026-08-30T23:59:59`
 - Default keyboard: `latam`
-- Contest firewall: `boca.icpcmexico.org|score.icpcmexico.org|icpcmexico.org|`
+- Contest firewall: `all` (sin firewall / sin drop para compatibilidad con MOJ)
 - Contest USB storage: disabled
-- Both bookmarks in all modes: `BOCA Contest` + `ICPC Mexico`
+- Bookmarks in all modes: `MOJ Contest`, `MOJ Ensaio`, `Guia MOJ`, `ICPC Mexico`
 
 ---
 
@@ -205,13 +205,22 @@ huronOS can be tested locally inside KVM without burning a physical USB:
 
 ---
 
+## NVIDIA Dedicated GPU Compatibility
+
+On systems with only dedicated NVIDIA graphics cards (no integrated GPU / iGPU), huronOS's default open-source `nouveau` driver can cause kernel hangs or a black screen.
+
+- **Solution:** Add `nomodeset nouveau.modeset=0` to the kernel parameters in `/boot/huronos.cfg`.
+- **Automated script:** `configure-nvidia-boot.sh` mounts the HURONOS partition, updates `boot/huronos.cfg`, and refreshes the checksum in `checksums`.
+
+---
+
 ## Development Guidelines: Shell Script Quality & ShellCheck
 
 > [!IMPORTANT]
 > **Mandatory verification:** Any modified or newly created shell script (`*.sh`) in this repository **must always be verified with `shellcheck`**:
 >
 > ```bash
-> shellcheck install-huronos.sh test-huronos-vm.sh inject-wallpaper.sh update-directives-wallpaper.sh
+> shellcheck install-huronos.sh test-huronos-vm.sh inject-wallpaper.sh update-directives-wallpaper.sh configure-nvidia-boot.sh
 > ```
 >
 > All scripts in this repo must pass `shellcheck` with zero errors and zero warnings before committing.

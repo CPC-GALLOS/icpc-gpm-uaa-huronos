@@ -1,5 +1,7 @@
-# Ignore ISO 
-huronOS-alpha-0.4-amd64.iso
+# Ignore ISOs and downloads
+*.iso
+*.iso.*
+*.part
 
 # Ignore system files
 .DS_Store
@@ -8,4 +10,3 @@ huronOS-alpha-0.4-amd64.iso
 
 # Ignore VM disk images
 *.img
-

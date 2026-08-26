@@ -18,11 +18,11 @@ WALLPAPER_FILE="$SCRIPT_DIR/wallpaper.png"
 
 # Locate ISO
 if [ ! -f "$ISO_PATH" ]; then
-    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "/home/ravary/Desktop/website" -maxdepth 1 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
+    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "/home/ravary/Desktop/website" "/home/ravary/d/VM" "$HOME/Downloads" -maxdepth 2 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
     if [ -n "$ISO_CANDIDATE" ] && [ -f "$ISO_CANDIDATE" ]; then
         ISO_PATH="$ISO_CANDIDATE"
     else
-        echo "❌ Error: huronOS ISO not found in $SCRIPT_DIR or ~/Desktop/website/"
+        echo "❌ Error: huronOS ISO not found in $SCRIPT_DIR, ~/Desktop/website/, or ~/d/VM/"
         exit 1
     fi
 fi
@@ -83,7 +83,7 @@ fi
 echo ""
 
 # --- Step 1: Check & install dependencies ---
-echo "[Step 1/8] Checking dependencies..."
+echo "[Step 1/9] Checking dependencies..."
 MISSING_TOOLS=()
 for cmd in mksquashfs unsquashfs parted fuser mkfs.vfat mkfs.ext4 perl wipefs; do
     if ! command -v "$cmd" &>/dev/null; then
@@ -112,13 +112,13 @@ fi
 echo ""
 
 # --- Step 2: Mask automounter ---
-echo "[Step 2/8] Masking udisks2 automounter..."
+echo "[Step 2/9] Masking udisks2 automounter..."
 sudo systemctl mask udisks2
 echo "✓ udisks2 masked (automount disabled)."
 echo ""
 
 # --- Step 3: Mount the ISO ---
-echo "[Step 3/8] Mounting ISO..."
+echo "[Step 3/9] Mounting ISO..."
 sudo mkdir -p "$MOUNT_POINT"
 sudo mount -o loop,ro "$ISO_PATH" "$MOUNT_POINT" 2>/dev/null || echo "(ISO already mounted, continuing...)"
 echo ""
@@ -148,7 +148,7 @@ read -r -p "Press Enter to continue to installation..."
 echo ""
 
 # --- Step 5: Run the installer ---
-echo "[Step 5/8] Running huronOS installer..."
+echo "[Step 5/9] Running huronOS installer..."
 echo ""
 echo "⚠  WARNING: The installer will ask you to select a target disk."
 echo "⚠  Double-check your USB device before confirming! ALL DATA WILL BE ERASED."
@@ -162,16 +162,23 @@ echo ""
 
 # --- Step 6: Inject custom wallpaper ---
 if [ -f "$WALLPAPER_FILE" ]; then
-    echo "[Step 6/8] Injecting custom wallpaper into USB..."
+    echo "[Step 6/9] Injecting custom wallpaper into USB..."
     sudo bash "$SCRIPT_DIR/inject-wallpaper.sh" "" "$WALLPAPER_FILE" || {
         echo "⚠️ Warning: Custom wallpaper injection encountered an issue, continuing..."
     }
 else
-    echo "[Step 6/8] No custom wallpaper.png found, skipping injection."
+    echo "[Step 6/9] No custom wallpaper.png found, skipping injection."
 fi
 echo ""
 
-# --- Step 7: CRITICAL — Manual sync ---
+# --- Step 7: Configure NVIDIA Bootloader compatibility ---
+echo "[Step 7/9] Configuring NVIDIA Safe Graphics / nomodeset boot options..."
+sudo bash "$SCRIPT_DIR/configure-nvidia-boot.sh" || {
+    echo "⚠️ Warning: NVIDIA boot configuration encountered an issue, continuing..."
+}
+echo ""
+
+# --- Step 8: CRITICAL — Manual sync ---
 echo "============================================="
 echo " ⚠  CRITICAL: Syncing disk buffers..."
 echo " Due to a known extlinux bug, we MUST sync"
@@ -186,8 +193,8 @@ sleep 5
 echo "✓ Disk buffers flushed. Safe to unplug in a moment."
 echo ""
 
-# --- Step 8: Cleanup ---
-echo "[Step 8/8] Cleaning up..."
+# --- Step 9: Cleanup ---
+echo "[Step 9/9] Cleaning up..."
 cd /
 sudo umount "$MOUNT_POINT" 2>/dev/null || true
 sudo systemctl unmask udisks2
@@ -206,8 +213,9 @@ echo "  3. Enter BIOS boot menu (F12/F2/Del)"
 echo "  4. Disable Secure Boot if UEFI"
 echo "  5. Boot from USB"
 echo "  6. huronOS auto-boots to contestant desktop"
-echo ""
-echo "Judge:   https://boca.icpcmexico.org"
+echo "Judge (MOJ):  https://moj.naquadah.com.br"
+echo "Ensaio:       https://ensaio-times-2026.moj.naquadah.com.br/"
+echo "Guía:         https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en"
 echo ""
 echo "Check your .hdf directives file for contest-specific times and settings."
 echo ""

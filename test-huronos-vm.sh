@@ -73,10 +73,11 @@ fi
 
 # Check ISO file
 if [ ! -f "$ISO_PATH" ]; then
-    if [ -f "/home/ravary/Desktop/website/${ISO_NAME}" ]; then
-        ISO_PATH="/home/ravary/Desktop/website/${ISO_NAME}"
+    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "/home/ravary/Desktop/website" "/home/ravary/d/VM" "$HOME/Downloads" -maxdepth 2 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
+    if [ -n "$ISO_CANDIDATE" ] && [ -f "$ISO_CANDIDATE" ]; then
+        ISO_PATH="$ISO_CANDIDATE"
     else
-        echo "❌ Error: ${ISO_NAME} not found at ${ISO_PATH}"
+        echo "❌ Error: ${ISO_NAME} not found at ${ISO_PATH}, ~/Desktop/website/, or ~/d/VM/"
         echo "   Please download it from https://mirrors.huronos.org/huronOS/alpha/huronOS-alpha-0.4-amd64.iso"
         echo "   and place it in the current directory."
         exit 1
