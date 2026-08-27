@@ -174,6 +174,9 @@ Run `bash 01-install-huronos.sh --help` for the full flag reference (including t
 > [!WARNING]
 > `--yes` auto-confirms the disk selection and **erases `--device` without asking again**. Double-check the device path — `lsblk` first — before running with `--yes`; there is no second confirmation prompt.
 
+> [!WARNING]
+> **Never run two `01-install-huronos.sh` invocations at the same time** (e.g. in two terminals, to prep two USBs at once). The script mounts the ISO at a fixed, shared path (`/media/iso`) and globally masks/unmasks the `udisks2` automounter (`sudo systemctl mask/unmask udisks2`) for the whole system — two concurrent runs will fight over that mount point, and whichever finishes first unmounts the ISO and re-enables `udisks2` out from under the other one still installing. To prep multiple USBs, run `01-install-huronos.sh` **once** to build a single "golden master" USB, then use `09-clone-huronos-usb.sh` for the rest — that script *is* built for concurrency (see "Step 6: Bulk-Cloning Additional USBs" below): it clones every target in parallel as background jobs, with no shared mount point or system-wide state to race on.
+
 ---
 
 ### Option B: Manual Execution & Modular Customization
