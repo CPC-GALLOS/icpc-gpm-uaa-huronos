@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 02-inject-custom-layer.sh — CPC GALLOS / UAA
-# Injects custom wallpaper, Xorg/Mesa graphics fallbacks, and VS Code
-# extensions (CPH, Microsoft Python & Red Hat Java) into a huronOS system partition or directory.
+# Injects custom wallpaper, Xorg/Mesa graphics fallbacks, Noto Color Emoji / DejaVu / Inter fonts,
+# Telegram Desktop, and VS Code extensions (CPH, Microsoft Python & Red Hat Java)
+# into a huronOS system partition or directory.
 #
 # Usage:
-#   bash 02-inject-custom-layer.sh [/dev/sdX1 | /path/to/mounted/HURONOS] [wallpaper.png]
+#   bash 02-inject-custom-layer.sh [/dev/sdX1 | /path/to/mounted/HURONOS] [wallpaper.png] [directives.hdf]
 # =============================================================================
 
 set -e
@@ -50,6 +51,17 @@ FBDEV_DEB_URL="https://deb.debian.org/debian/pool/main/x/xserver-xorg-video-fbde
 FBDEV_DEB_SHA256="cccf3792ff2b6c95b55269b67ca7c5213a00561711fe8d10e5436961faf5d9d9"
 SPICE_VDAGENT_DEB_URL="https://deb.debian.org/debian/pool/main/s/spice-vdagent/spice-vdagent_0.20.0-2_amd64.deb"
 SPICE_VDAGENT_DEB_SHA256="19800ed07b2b4d1fe65eb1b20affdc14132fc712da0b9577560482a7a9c48aa8"
+
+NOTO_EMOJI_DEB_URL="https://deb.debian.org/debian/pool/main/f/fonts-noto-color-emoji/fonts-noto-color-emoji_2.051-1_all.deb"
+NOTO_EMOJI_DEB_SHA256="fd24bbdf01db0e146682eea6d9f10448260fa77da579a6cc0aa336912f143638"
+DEJAVU_CORE_DEB_URL="https://deb.debian.org/debian/pool/main/f/fonts-dejavu/fonts-dejavu-core_2.37-8_all.deb"
+DEJAVU_CORE_DEB_SHA256="86635b3d25b3655fc11cb3ecc3af59f0bf19643b02b94f2de48bd10253cdba12"
+INTER_DEB_URL="https://deb.debian.org/debian/pool/main/f/fonts-inter/fonts-inter_4.0~beta7+ds-1_all.deb"
+INTER_DEB_SHA256="6afd9014550e04b58bccf64b94f92ae1dbfd8018489b92de835408970234c24c"
+
+TELEGRAM_TAR_URL="https://telegram.org/dl/desktop/linux"
+TELEGRAM_FALLBACK_URL="https://github.com/telegramdesktop/tdesktop/releases/download/v5.1.7/tsetup.5.1.7.tar.xz"
+TELEGRAM_ICON_URL="https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/art/icon512.png"
 
 # Extension definitions: MODULE_ID | DEFAULT_NAME | FALLBACK_URL | LOCAL_CANDIDATE_PATTERNS
 EXT_CONFIGS=(
@@ -136,6 +148,7 @@ fi
 
 BASE_DIR="$TARGET_DIR/huronOS/base"
 SOFTWARE_PROG_DIR="$TARGET_DIR/huronOS/software/programming"
+SOFTWARE_INTERNET_DIR="$TARGET_DIR/huronOS/software/internet"
 DATA_BACKUPS_DIR="$TARGET_DIR/huronOS/data/backups"
 CHECKSUMS_FILE="$TARGET_DIR/checksums"
 
@@ -144,6 +157,9 @@ if [ ! -d "$BASE_DIR" ] && [ -d "$TARGET_DIR/base" ]; then
 fi
 if [ ! -d "$SOFTWARE_PROG_DIR" ] && [ -d "$TARGET_DIR/software/programming" ]; then
     SOFTWARE_PROG_DIR="$TARGET_DIR/software/programming"
+fi
+if [ ! -d "$SOFTWARE_INTERNET_DIR" ] && [ -d "$TARGET_DIR/software/internet" ]; then
+    SOFTWARE_INTERNET_DIR="$TARGET_DIR/software/internet"
 fi
 if [ ! -d "$DATA_BACKUPS_DIR" ] && [ -d "$TARGET_DIR/data/backups" ]; then
     DATA_BACKUPS_DIR="$TARGET_DIR/data/backups"
@@ -154,7 +170,7 @@ fi
 
 echo "Target base directory: $BASE_DIR"
 
-# Unsquash and rebuild 05-custom.hsl with wallpaper, graphics fix, and VS Code extensions
+# Unsquash and rebuild 05-custom.hsl with wallpaper, graphics fix, fonts, Telegram, and VS Code extensions
 TMP_LAB="/tmp/huronos-layer-lab-$$"
 mkdir -p "$TMP_LAB/squashfs-root"
 
@@ -252,6 +268,284 @@ EOF
 ln -sf /usr/lib/mesa-diverted "$TMP_LAB/squashfs-root/etc/alternatives/glx"
 ln -sf /usr/lib/xorg/modules/extensions/libglx.so "$TMP_LAB/squashfs-root/etc/alternatives/glx--libglxserver_nvidia.so"
 
+# =============================================================================
+# Emoji & Unicode Font Injection (Noto Color Emoji, DejaVu Sans & Inter)
+# =============================================================================
+echo "Injecting Noto Color Emoji, DejaVu, and Inter fonts for full MOJ UI/Unicode support..."
+mkdir -p "$TMP_LAB/squashfs-root/usr/share/fonts/truetype/noto"
+mkdir -p "$TMP_LAB/squashfs-root/usr/share/fonts/truetype/dejavu"
+mkdir -p "$TMP_LAB/squashfs-root/usr/share/fonts/opentype/inter"
+mkdir -p "$TMP_LAB/squashfs-root/etc/fonts/conf.d"
+mkdir -p "$TMP_LAB/squashfs-root/etc/fonts/conf.avail"
+mkdir -p "$TMP_LAB/squashfs-root/usr/share/fontconfig/conf.avail"
+
+LOCAL_NOTO_DEB=""
+if [ -f "$SCRIPT_DIR/fonts-noto-color-emoji.deb" ]; then
+    LOCAL_NOTO_DEB="$SCRIPT_DIR/fonts-noto-color-emoji.deb"
+else
+    FOUND_NOTO=$(find "$SCRIPT_DIR" -maxdepth 1 -name "fonts-noto-color-emoji*.deb" 2>/dev/null | head -n 1 || true)
+    if [ -n "$FOUND_NOTO" ] && [ -f "$FOUND_NOTO" ]; then
+        LOCAL_NOTO_DEB="$FOUND_NOTO"
+    fi
+fi
+if [ -z "$LOCAL_NOTO_DEB" ] || [ ! -f "$LOCAL_NOTO_DEB" ]; then
+    LOCAL_NOTO_DEB="$TMP_LAB/noto-emoji.deb"
+    echo "  Downloading fonts-noto-color-emoji package..."
+    curl -fsSL --retry 2 -o "$LOCAL_NOTO_DEB" "$NOTO_EMOJI_DEB_URL" || true
+    if [ -n "$NOTO_EMOJI_DEB_SHA256" ]; then
+        echo "$NOTO_EMOJI_DEB_SHA256  $LOCAL_NOTO_DEB" | sha256sum -c - >/dev/null 2>&1 || true
+    fi
+fi
+
+if [ -f "$LOCAL_NOTO_DEB" ]; then
+    mkdir -p "$TMP_LAB/noto-pkg"
+    (
+        cd "$TMP_LAB/noto-pkg"
+        ar x "$LOCAL_NOTO_DEB" 2>/dev/null || true
+        [ -f data.tar.xz ] && tar -xJf data.tar.xz 2>/dev/null || true
+    )
+    if [ -f "$TMP_LAB/noto-pkg/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf" ]; then
+        cp -f "$TMP_LAB/noto-pkg/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf" \
+            "$TMP_LAB/squashfs-root/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
+        echo "✓ Injected Noto Color Emoji font (/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf)"
+    fi
+fi
+
+LOCAL_DEJAVU_DEB=""
+if [ -f "$SCRIPT_DIR/fonts-dejavu-core.deb" ]; then
+    LOCAL_DEJAVU_DEB="$SCRIPT_DIR/fonts-dejavu-core.deb"
+else
+    FOUND_DEJAVU=$(find "$SCRIPT_DIR" -maxdepth 1 -name "fonts-dejavu-core*.deb" 2>/dev/null | head -n 1 || true)
+    if [ -n "$FOUND_DEJAVU" ] && [ -f "$FOUND_DEJAVU" ]; then
+        LOCAL_DEJAVU_DEB="$FOUND_DEJAVU"
+    fi
+fi
+if [ -z "$LOCAL_DEJAVU_DEB" ] || [ ! -f "$LOCAL_DEJAVU_DEB" ]; then
+    LOCAL_DEJAVU_DEB="$TMP_LAB/dejavu-core.deb"
+    echo "  Downloading fonts-dejavu-core package..."
+    curl -fsSL --retry 2 -o "$LOCAL_DEJAVU_DEB" "$DEJAVU_CORE_DEB_URL" || true
+    if [ -n "$DEJAVU_CORE_DEB_SHA256" ]; then
+        echo "$DEJAVU_CORE_DEB_SHA256  $LOCAL_DEJAVU_DEB" | sha256sum -c - >/dev/null 2>&1 || true
+    fi
+fi
+
+if [ -f "$LOCAL_DEJAVU_DEB" ]; then
+    mkdir -p "$TMP_LAB/dejavu-pkg"
+    (
+        cd "$TMP_LAB/dejavu-pkg"
+        ar x "$LOCAL_DEJAVU_DEB" 2>/dev/null || true
+        [ -f data.tar.xz ] && tar -xJf data.tar.xz 2>/dev/null || true
+    )
+    if [ -d "$TMP_LAB/dejavu-pkg/usr/share/fonts/truetype/dejavu" ]; then
+        cp -rf "$TMP_LAB/dejavu-pkg/usr/share/fonts/truetype/dejavu/"* \
+            "$TMP_LAB/squashfs-root/usr/share/fonts/truetype/dejavu/" 2>/dev/null || true
+        echo "✓ Injected DejaVu Sans fonts (/usr/share/fonts/truetype/dejavu/)"
+    fi
+    if [ -d "$TMP_LAB/dejavu-pkg/etc/fonts/conf.avail" ]; then
+        cp -rf "$TMP_LAB/dejavu-pkg/etc/fonts/conf.avail/"* \
+            "$TMP_LAB/squashfs-root/etc/fonts/conf.avail/" 2>/dev/null || true
+    fi
+    if [ -d "$TMP_LAB/dejavu-pkg/etc/fonts/conf.d" ]; then
+        cp -rf "$TMP_LAB/dejavu-pkg/etc/fonts/conf.d/"* \
+            "$TMP_LAB/squashfs-root/etc/fonts/conf.d/" 2>/dev/null || true
+    fi
+fi
+
+LOCAL_INTER_DEB=""
+if [ -f "$SCRIPT_DIR/fonts-inter.deb" ]; then
+    LOCAL_INTER_DEB="$SCRIPT_DIR/fonts-inter.deb"
+else
+    FOUND_INTER=$(find "$SCRIPT_DIR" -maxdepth 1 -name "fonts-inter*.deb" 2>/dev/null | head -n 1 || true)
+    if [ -n "$FOUND_INTER" ] && [ -f "$FOUND_INTER" ]; then
+        LOCAL_INTER_DEB="$FOUND_INTER"
+    fi
+fi
+if [ -z "$LOCAL_INTER_DEB" ] || [ ! -f "$LOCAL_INTER_DEB" ]; then
+    LOCAL_INTER_DEB="$TMP_LAB/fonts-inter.deb"
+    echo "  Downloading fonts-inter package..."
+    curl -fsSL --retry 2 -o "$LOCAL_INTER_DEB" "$INTER_DEB_URL" || true
+    if [ -n "$INTER_DEB_SHA256" ]; then
+        echo "$INTER_DEB_SHA256  $LOCAL_INTER_DEB" | sha256sum -c - >/dev/null 2>&1 || true
+    fi
+fi
+
+if [ -f "$LOCAL_INTER_DEB" ]; then
+    mkdir -p "$TMP_LAB/inter-pkg"
+    (
+        cd "$TMP_LAB/inter-pkg"
+        ar x "$LOCAL_INTER_DEB" 2>/dev/null || true
+        [ -f data.tar.xz ] && tar -xJf data.tar.xz 2>/dev/null || true
+    )
+    if [ -d "$TMP_LAB/inter-pkg/usr/share/fonts/opentype/inter" ]; then
+        cp -f "$TMP_LAB/inter-pkg/usr/share/fonts/opentype/inter/Inter-"*.otf \
+            "$TMP_LAB/squashfs-root/usr/share/fonts/opentype/inter/" 2>/dev/null || true
+        echo "✓ Injected Inter UI font (/usr/share/fonts/opentype/inter/) — matches MOJ's font-family:\"Inter\""
+    fi
+fi
+
+# Fontconfig alias & fallback configuration for Emoji and Symbols
+cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/fonts/conf.avail/56-fonts-noto-color-emoji.conf"
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <match target="pattern">
+    <test qual="any" name="family"><string>emoji</string></test>
+    <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+  </match>
+  <match target="pattern">
+    <test name="family"><string>sans-serif</string></test>
+    <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+  </match>
+  <match target="pattern">
+    <test name="family"><string>serif</string></test>
+    <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+  </match>
+  <match target="pattern">
+    <test name="family"><string>monospace</string></test>
+    <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+  </match>
+</fontconfig>
+EOF
+cp -f "$TMP_LAB/squashfs-root/etc/fonts/conf.avail/56-fonts-noto-color-emoji.conf" \
+    "$TMP_LAB/squashfs-root/usr/share/fontconfig/conf.avail/56-fonts-noto-color-emoji.conf"
+ln -sf /etc/fonts/conf.avail/56-fonts-noto-color-emoji.conf \
+    "$TMP_LAB/squashfs-root/etc/fonts/conf.d/56-fonts-noto-color-emoji.conf" 2>/dev/null || true
+
+# =============================================================================
+# Telegram Desktop Injection & Offline Integration
+# =============================================================================
+echo "Injecting Telegram Desktop application..."
+declare -a GENERATED_HSMS=()
+
+LOCAL_TG_TAR=""
+if [ -f "$SCRIPT_DIR/tsetup.tar.xz" ]; then
+    LOCAL_TG_TAR="$SCRIPT_DIR/tsetup.tar.xz"
+else
+    FOUND_TG=$(find "$SCRIPT_DIR" -maxdepth 1 -name "tsetup*.tar.xz" 2>/dev/null | head -n 1 || true)
+    if [ -n "$FOUND_TG" ] && [ -f "$FOUND_TG" ]; then
+        LOCAL_TG_TAR="$FOUND_TG"
+    fi
+fi
+if [ -z "$LOCAL_TG_TAR" ] || [ ! -f "$LOCAL_TG_TAR" ]; then
+    LOCAL_TG_TAR="$TMP_LAB/tsetup.tar.xz"
+    echo "  Downloading Telegram Desktop..."
+    curl -fsSL --retry 2 -o "$LOCAL_TG_TAR" "$TELEGRAM_TAR_URL" || \
+        curl -fsSL --retry 2 -o "$LOCAL_TG_TAR" "$TELEGRAM_FALLBACK_URL" || true
+fi
+
+LOCAL_TG_ICON=""
+if [ -f "$SCRIPT_DIR/telegram-icon.png" ]; then
+    LOCAL_TG_ICON="$SCRIPT_DIR/telegram-icon.png"
+elif [ -f "$SCRIPT_DIR/icon512.png" ]; then
+    LOCAL_TG_ICON="$SCRIPT_DIR/icon512.png"
+fi
+if [ -z "$LOCAL_TG_ICON" ] || [ ! -f "$LOCAL_TG_ICON" ]; then
+    LOCAL_TG_ICON="$TMP_LAB/telegram-icon.png"
+    curl -fsSL --retry 2 -o "$LOCAL_TG_ICON" "$TELEGRAM_ICON_URL" || true
+fi
+
+if [ -f "$LOCAL_TG_TAR" ]; then
+    TG_UNPACK="$TMP_LAB/unpack_telegram"
+    mkdir -p "$TG_UNPACK"
+    tar -xf "$LOCAL_TG_TAR" -C "$TG_UNPACK" 2>/dev/null || true
+
+    if [ -f "$TG_UNPACK/Telegram/Telegram" ]; then
+        mkdir -p "$TMP_LAB/squashfs-root/opt/telegram"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/bin"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/local/bin"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/share/applications"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/share/pixmaps"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/share/icons/hicolor/512x512/apps"
+        mkdir -p "$TMP_LAB/squashfs-root/etc/xdg"
+        mkdir -p "$TMP_LAB/squashfs-root/home/contestant"
+
+        install -m 0755 "$TG_UNPACK/Telegram/Telegram" "$TMP_LAB/squashfs-root/opt/telegram/Telegram"
+        if [ -f "$TG_UNPACK/Telegram/Updater" ]; then
+            install -m 0755 "$TG_UNPACK/Telegram/Updater" "$TMP_LAB/squashfs-root/opt/telegram/Updater"
+        fi
+
+        ln -sf /opt/telegram/Telegram "$TMP_LAB/squashfs-root/usr/bin/telegram-desktop"
+        ln -sf /opt/telegram/Telegram "$TMP_LAB/squashfs-root/usr/local/bin/telegram-desktop"
+        ln -sf /opt/telegram/Telegram "$TMP_LAB/squashfs-root/usr/local/bin/Telegram"
+
+        if [ -f "$LOCAL_TG_ICON" ]; then
+            cp -f "$LOCAL_TG_ICON" "$TMP_LAB/squashfs-root/usr/share/icons/hicolor/512x512/apps/telegram.png"
+            cp -f "$LOCAL_TG_ICON" "$TMP_LAB/squashfs-root/usr/share/pixmaps/telegram.png"
+            cp -f "$LOCAL_TG_ICON" "$TMP_LAB/squashfs-root/usr/share/pixmaps/org.telegram.desktop.png"
+        fi
+
+        cat << 'EOF' > "$TMP_LAB/squashfs-root/usr/share/applications/org.telegram.desktop.desktop"
+[Desktop Entry]
+Name=Telegram Desktop
+Comment=Official desktop application for the Telegram messaging service
+TryExec=telegram-desktop
+Exec=telegram-desktop -- %u
+Icon=telegram
+Terminal=false
+Type=Application
+Categories=Network;InstantMessaging;
+MimeType=x-scheme-handler/tg;
+Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;
+Actions=Quit;
+EOF
+        cp -f "$TMP_LAB/squashfs-root/usr/share/applications/org.telegram.desktop.desktop" \
+            "$TMP_LAB/squashfs-root/usr/share/applications/telegramdesktop.desktop"
+
+        # Register URL scheme handler for tg:// and t.me deep links
+        touch "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"
+        if ! grep -q "x-scheme-handler/tg=" "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"; then
+            echo "x-scheme-handler/tg=org.telegram.desktop.desktop;telegramdesktop.desktop;" >> "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"
+        fi
+
+        cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/xdg/mimeapps.list"
+[Default Applications]
+x-scheme-handler/tg=org.telegram.desktop.desktop
+
+[Added Associations]
+x-scheme-handler/tg=org.telegram.desktop.desktop;
+EOF
+
+        # Keep offline copy in /opt/telegram and /home/contestant/
+        cp -f "$LOCAL_TG_TAR" "$TMP_LAB/squashfs-root/opt/telegram/tsetup.tar.xz"
+        cp -f "$LOCAL_TG_TAR" "$TMP_LAB/squashfs-root/home/contestant/tsetup.tar.xz"
+
+        # Build standalone .hsm module for internet/telegram
+        if [ -d "$SOFTWARE_INTERNET_DIR" ]; then
+            TG_ROOT="$TMP_LAB/root_telegram"
+            mkdir -p "$TG_ROOT/opt/telegram"
+            mkdir -p "$TG_ROOT/usr/bin"
+            mkdir -p "$TG_ROOT/usr/share/applications"
+            mkdir -p "$TG_ROOT/usr/share/pixmaps"
+            mkdir -p "$TG_ROOT/usr/share/icons/hicolor/512x512/apps"
+
+            install -m 0755 "$TG_UNPACK/Telegram/Telegram" "$TG_ROOT/opt/telegram/Telegram"
+            if [ -f "$TG_UNPACK/Telegram/Updater" ]; then
+                install -m 0755 "$TG_UNPACK/Telegram/Updater" "$TG_ROOT/opt/telegram/Updater"
+            fi
+            ln -sf /opt/telegram/Telegram "$TG_ROOT/usr/bin/telegram-desktop"
+            cp -f "$TMP_LAB/squashfs-root/usr/share/applications/org.telegram.desktop.desktop" "$TG_ROOT/usr/share/applications/"
+            cp -f "$TMP_LAB/squashfs-root/usr/share/applications/telegramdesktop.desktop" "$TG_ROOT/usr/share/applications/"
+            if [ -f "$LOCAL_TG_ICON" ]; then
+                cp -f "$LOCAL_TG_ICON" "$TG_ROOT/usr/share/icons/hicolor/512x512/apps/telegram.png"
+                cp -f "$LOCAL_TG_ICON" "$TG_ROOT/usr/share/pixmaps/telegram.png"
+            fi
+
+            TG_HSM_FILE="$SOFTWARE_INTERNET_DIR/telegram.hsm"
+            echo "  Building standalone module: $TG_HSM_FILE"
+            TMP_TG_HSM="$TMP_LAB/telegram.hsm"
+            rm -f "$TMP_TG_HSM"
+            NPROCS=$(nproc 2>/dev/null || echo 4)
+            mksquashfs "$TG_ROOT" "$TMP_TG_HSM" -comp xz -b 256K -processors "$NPROCS" -always-use-fragments -noappend >/dev/null
+            cp -f "$TMP_TG_HSM" "$TG_HSM_FILE"
+            GENERATED_HSMS+=("internet/telegram.hsm")
+        fi
+        echo "✓ Injected Telegram Desktop"
+    fi
+fi
+
+# =============================================================================
+# VS Code Extensions Injection & Packaging
+# =============================================================================
 mkdir -p "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/ids"
 mkdir -p "$TMP_LAB/squashfs-root/opt/codium/vsix"
 mkdir -p "$TMP_LAB/squashfs-root/home/contestant/vsix"
@@ -269,8 +563,6 @@ if [ -d "$SOFTWARE_PROG_DIR" ] && [ -f "$SOFTWARE_PROG_DIR/vsc-cpptools.hsm" ]; 
         cp -rf "$CPP_UNPACK/opt/codium/contestant/extensions/"* "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/" 2>/dev/null || true
     fi
 fi
-
-declare -a GENERATED_HSMS=()
 
 for ext_spec in "${EXT_CONFIGS[@]}"; do
     IFS='|' read -r MOD_ID DEFAULT_EXT_NAME EXT_URL PATTERNS <<< "$ext_spec"
@@ -357,7 +649,7 @@ EOF
             NPROCS=$(nproc 2>/dev/null || echo 4)
             mksquashfs "$EXT_ROOT" "$TMP_HSM" -comp xz -b 256K -processors "$NPROCS" -always-use-fragments -noappend >/dev/null
             cp -f "$TMP_HSM" "$HSM_FILE"
-            GENERATED_HSMS+=("${MOD_ID}.hsm")
+            GENERATED_HSMS+=("programming/${MOD_ID}.hsm")
         fi
     fi
 done
@@ -398,7 +690,7 @@ echo "✓ All offline VSIX extensions processed."
 EOF
 chmod 755 "$TMP_LAB/squashfs-root/usr/local/bin/install-vsix-extensions"
 
-# Register extensions in huronOS module lists
+# Register extensions and modules in huronOS module lists
 if [ ! -f "$TMP_LAB/squashfs-root/etc/hmm/any" ]; then
     cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/hmm/any"
 HURONDIR=/run/initramfs/memory/system/huronOS/software/
@@ -409,6 +701,7 @@ debuggers/visualvm                          false
 internet/chromium                           false
 internet/crow                               false
 internet/firefox                            false
+internet/telegram                           false
 langs/dotnet                                false
 langs/g++                                   false
 langs/gcc                                   false
@@ -449,7 +742,7 @@ programming/vsc-python                      false
 programming/vsc-java                        false
 EOF
 else
-    for mod in "programming/vsc-cph" "programming/vsc-python" "programming/vsc-java"; do
+    for mod in "internet/telegram" "programming/vsc-cph" "programming/vsc-python" "programming/vsc-java"; do
         if ! grep -q "$mod" "$TMP_LAB/squashfs-root/etc/hmm/any"; then
             printf "%-43s false\n" "$mod" >> "$TMP_LAB/squashfs-root/etc/hmm/any"
         fi
@@ -465,6 +758,7 @@ debuggers/visualvm
 internet/chromium
 internet/crow
 internet/firefox
+internet/telegram
 langs/dotnet
 langs/g++
 langs/gcc
@@ -505,7 +799,7 @@ programming/vsc-python
 programming/vsc-java
 EOF
 else
-    for mod in "programming/vsc-cph" "programming/vsc-python" "programming/vsc-java"; do
+    for mod in "internet/telegram" "programming/vsc-cph" "programming/vsc-python" "programming/vsc-java"; do
         if ! grep -q "$mod" "$TMP_LAB/squashfs-root/etc/hsync/all_software"; then
             echo "$mod" >> "$TMP_LAB/squashfs-root/etc/hsync/all_software"
         fi
@@ -524,7 +818,7 @@ mksquashfs "$TMP_LAB/squashfs-root" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -
 
 cp -f "$TMP_LAB/05-custom.hsl" "$CUSTOM_HSL"
 rm -rf "$TMP_LAB"
-echo "✓ Updated $CUSTOM_HSL (with wallpaper, graphics fix, and full VS Code extensions suite)"
+echo "✓ Updated $CUSTOM_HSL (with wallpaper, graphics fix, Noto Color Emoji/DejaVu/Inter fonts, Telegram Desktop, and full VS Code extensions suite)"
 
 # Pre-seed wallpaper in huronOS/data/backups/
 mkdir -p "$DATA_BACKUPS_DIR"
@@ -585,12 +879,24 @@ if [ -f "$CHECKSUMS_FILE" ]; then
     fi
 
     for hsm in "${GENERATED_HSMS[@]}"; do
-        HSM_PATH="huronOS/software/programming/$hsm"
-        [ ! -f "$HSM_PATH" ] && HSM_PATH="software/programming/$hsm"
-        if [ -f "$HSM_PATH" ]; then
+        HSM_BASENAME="$(basename "$hsm")"
+        HSM_PATH=""
+        for candidate in \
+            "huronOS/software/programming/$HSM_BASENAME" \
+            "software/programming/$HSM_BASENAME" \
+            "huronOS/software/internet/$HSM_BASENAME" \
+            "software/internet/$HSM_BASENAME" \
+            "huronOS/software/$hsm" \
+            "software/$hsm"; do
+            if [ -f "$candidate" ]; then
+                HSM_PATH="$candidate"
+                break
+            fi
+        done
+        if [ -n "$HSM_PATH" ] && [ -f "$HSM_PATH" ]; then
             NEW_HSM_CHECKSUM=$(sha256sum "$HSM_PATH")
-            if grep -q "$hsm" "$CHECKSUMS_FILE"; then
-                sed -i "s|.*$hsm.*|$NEW_HSM_CHECKSUM|" "$CHECKSUMS_FILE"
+            if grep -q "$HSM_BASENAME" "$CHECKSUMS_FILE"; then
+                sed -i "s|.*$HSM_BASENAME.*|$NEW_HSM_CHECKSUM|" "$CHECKSUMS_FILE"
             else
                 echo "$NEW_HSM_CHECKSUM" >> "$CHECKSUMS_FILE"
             fi
@@ -606,5 +912,7 @@ echo ""
 echo "============================================="
 echo " ✓ Custom layer successfully injected!"
 echo " Wallpaper SHA256: $WALLPAPER_SHA"
+echo " Fonts: Noto Color Emoji, DejaVu Unicode & Inter UI ready"
+echo " Telegram Desktop: App & Module ready"
 echo " VS Code Extensions: C/C++, CPH, Python & Java ready"
 echo "============================================="

@@ -82,6 +82,7 @@ WallpaperSha256=<sha256 of wallpaper image>
 | `internet/chromium` | Chromium browser |
 | `internet/firefox` | Firefox browser |
 | `internet/crow` | Crow Dictionary App |
+| `internet/telegram` | Telegram Desktop application & protocol handler |
 | `langs/g++` | GNU C++ compiler |
 | `langs/gcc` | GNU C compiler |
 | `langs/javac` | OpenJDK Java |
@@ -114,6 +115,8 @@ WallpaperSha256=<sha256 of wallpaper image>
 | `programming/vsc-clangd` | VSCode ClangD extension |
 | `programming/vsc-cpptools` | VSCode C++ Tools extension |
 | `programming/vsc-cph` | VSCode Competitive Programming Helper (cph) extension |
+| `programming/vsc-python` | VSCode Microsoft Python extension |
+| `programming/vsc-java` | VSCode Red Hat Java extension |
 | `programming/vsc-cpp-compile-run` | VSCode CPP Compile/Run |
 | `programming/vsc-vscodevim` | VSCode Vim extension |
 | `programming/vsc-makefile-tools` | VSCode Makefile Tools |
@@ -172,13 +175,41 @@ Edit on the USB: `HURONOS/data/configs/sync-server.conf`
 
 Key settings:
 
-- Contest window: `2026-08-29T10:45:00` → `2026-08-29T16:15:00` (includes 15-min buffer for mode transitions)
+- Contest window: `2026-08-29T10:57:00` → `2026-08-29T16:20:00` (starts 3 min early for the ~2 min event->contest mode transition; ends 20 min late to allow contestants time to save/backup code)
 - Config expires: `2026-08-30T23:59:59`
 - Default keyboard: `latam`
 - Contest firewall: `all` (sin firewall / sin drop para compatibilidad con MOJ)
 - Contest USB storage: disabled
-- Bookmarks in all modes: `MOJ Contest`, `MOJ Ensaio`, `Guia MOJ`, `ICPC Mexico`
-- Available software includes: `programming/vscode`, `programming/vsc-cpptools`, `programming/vsc-cph`, `programming/vsc-python`, `programming/vsc-java`
+- Bookmarks in all modes:
+  - `MOJ Contest`: `https://moj.naquadah.com.br`
+  - `MOJ Ensaio`: `https://ensaio-times-2026.moj.naquadah.com.br/`
+  - `Guia MOJ`: `https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en`
+  - `MOJ Bot (Telegram)`: `https://t.me/mojinho_bot?start=978147e0-b481-45a5-979c-076f13cf5369`
+  - `BOCA Juez (Fallback)`: `https://boca.icpcmexico.org`
+  - `BOCA Score (Fallback)`: `https://score.icpcmexico.org/`
+  - `ICPC Mexico`: `https://icpcmexico.org`
+- Available software:
+  - `[Always]` & `[Event]`: includes `internet/telegram`, `internet/chromium`, `langs/*`, `tools/*`, `programming/*` (CPH, Python, Java)
+  - `[Contest]`: includes compilers, IDEs, VS Code extensions; omits `internet/telegram` to maintain contest integrity
+
+---
+
+## Telegram Desktop, Noto Color Emoji / Unicode Fonts & Inter UI Font Integration
+
+1. **Telegram Desktop (`internet/telegram`)**:
+   - Packaged as a standalone Linux binary in `/opt/telegram/Telegram` and standalone module `huronOS/software/internet/telegram.hsm`.
+   - Desktop entry `/usr/share/applications/org.telegram.desktop.desktop` registered with `x-scheme-handler/tg` MIME association.
+   - Allows contestants to click the `@mojinho_bot` start URL (`https://t.me/mojinho_bot?start=...`) directly from Chromium or bookmarks to create their MOJ accounts.
+   - Available in `[Always]` and `[Event]` modes before the contest.
+
+2. **Full Emoji & Unicode Symbol Support**:
+   - `fonts-noto-color-emoji` (`NotoColorEmoji.ttf`) and `fonts-dejavu-core` (`DejaVuSans.ttf`, incl. `DejaVuSansMono.ttf`) injected into `05-custom.hsl`.
+   - Fontconfig fallback aliases configured in `/etc/fonts/conf.d/56-fonts-noto-color-emoji.conf` so Chromium and all X11/GTK apps render all Unicode emojis (`📖`, `👥`, `👤`, `👔`, `🎩`, `🎪`, `⚖️`, `👑`, etc.) in full color instead of missing hollow square boxes (`[]`).
+
+3. **Inter UI Font (matches MOJ's design)**:
+   - `fonts-inter` (`Inter-*.otf` static weights, `InterDisplay-*` excluded as unused) injected into `/usr/share/fonts/opentype/inter/`.
+   - MOJ's stylesheet (`ui.css`) declares `font-family:"Inter",system-ui,...,sans-serif` with no `@font-face`/CDN of its own — without this package Chromium/Firefox silently fell back to `Segoe UI`/`Roboto`. No fontconfig alias is needed: the OTF's internal family name is already `Inter`, so fontconfig matches it directly once the files are present.
+
 
 ---
 
@@ -255,6 +286,21 @@ huronOS alpha 0.4 ships with **VSCodium 1.81.1** (August 2023). In contest envir
 7. **Scripts**:
    - `02b-inject-vscode-extensions.sh`: Standalone injection script for USB, VM, or mounted HURONOS directory.
    - `02-inject-custom-layer.sh`, `01-install-huronos.sh`, `05-test-huronos-vm.sh`: Automatically perform full extension and wallpaper injection.
+
+---
+
+## Build-Cache Container (`Containerfile.build-cache`)
+
+All the offline `.vsix`/`.deb`/`.tar.xz` inputs above (VS Code extensions, and the fonts & Telegram Desktop tarball from § "Telegram Desktop, Noto Color Emoji / Unicode Fonts & Inter UI Font Integration") live in the repo root but are `.gitignore`d due to size. `Containerfile.build-cache` (`FROM scratch`) packages them into one reusable image so `01-install-huronos.sh`/`02-inject-custom-layer.sh` find them locally on a fresh checkout instead of re-downloading from Debian/GitHub/Telegram mirrors:
+
+```bash
+podman build -f Containerfile.build-cache -t icpc-gpm-uaa-huronos/build-cache:latest .
+podman create --name gpm-cache-tmp icpc-gpm-uaa-huronos/build-cache:latest
+podman cp gpm-cache-tmp:/cache/. .
+podman rm gpm-cache-tmp
+```
+
+Deliberately excludes `huronOS-alpha-0.4-amd64.iso` (separate `.gitignore` category, 5.3GB) and `huronos-vm-disk.img` (ephemeral VM test output, not a build input). See README.md § "Build-Cache Container" for the full usage walkthrough (export/import as tarball, consuming it as a `COPY --from=` stage).
 
 ---
 

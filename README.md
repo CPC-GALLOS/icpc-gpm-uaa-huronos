@@ -24,9 +24,15 @@ icpc-gpm-uaa-huronos/
 ├── 07-test-huronos-vbox.sh             # [VM - VBox Disk] Converts disk image to VDI and boots inside Oracle VirtualBox
 ├── 08-test-huronos-usb-vbox.sh         # [VM - VBox USB] Direct physical USB boot inside Oracle VirtualBox via raw VMDK
 ├── 09-clone-huronos-usb.sh             # [Utility] Bulk-clones a finished "golden master" USB onto other identical-capacity USBs
+├── Containerfile.build-cache           # [Utility] Packages gitignored .vsix/.deb/.tar.xz build inputs into a reusable cache image
 ├── competitive-programming-helper-*.vsix # Offline CPH extension package for VS Code
 ├── ms-python.python-*.vsix             # Offline Python extension package for VS Code
 ├── redhat.java-*.vsix                  # Offline Java language support package for VS Code
+├── fonts-noto-color-emoji.deb          # Offline Noto Color Emoji font package
+├── fonts-dejavu-core.deb               # Offline DejaVu Sans / Mono font package
+├── fonts-inter.deb                     # Offline Inter UI font package (matches MOJ's typography)
+├── tsetup.tar.xz                       # Offline Telegram Desktop standalone binary tarball
+├── telegram-icon.png                   # Telegram Desktop application icon
 ├── huronos-wallpaper.png               # Official custom contest wallpaper (1920×1080)
 ├── *.hdf                               # Contest directives configuration files
 ├── .gitignore                          # Ignores ISOs, VM disk images, and binary artifacts
@@ -38,7 +44,7 @@ icpc-gpm-uaa-huronos/
 
 | File | Contest | Date & Schedule | Directives URL |
 | --- | --- | --- | --- |
-| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date | Aug 29, 2026, 10:45–16:15 CST (includes 15-min buffer) | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
+| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date | Aug 29, 2026, 10:57–16:20 CST (starts 3 min early for mode transition, ends 20 min late for code backup) | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
 
 ---
 
@@ -138,6 +144,35 @@ Prompts:
 2. **Directives URL:** GitHub Raw URL of the corresponding `.hdf` file.
 3. **Server IP:** *(Leave blank for DHCP)*
 4. **Target Disk:** Select the correct USB block device (e.g. `/dev/sdb`).
+
+#### Non-Interactive / Scripted Installation
+
+For lab prep across many machines, every prompt above has a matching CLI flag so the whole install can run unattended (e.g. from `09-clone-huronos-usb.sh` or a lab-prep script):
+
+```bash
+bash 01-install-huronos.sh \
+  --device /dev/sdb \
+  --config icpc-gpm-2026-3rd-date.hdf \
+  --password cpcgallos \
+  --url https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf \
+  --wallpaper huronos-wallpaper.png \
+  --yes
+```
+
+| Flag | Prompt it replaces | Default if omitted |
+| --- | --- | --- |
+| `-d, --device <dev>` | Target Disk | none — interactive disk selection |
+| `-c, --config, --hdf <file>` | *(not prompted)* | `icpc-gpm-2026-3rd-date.hdf` |
+| `-p, --password <pass>` | Root Password | `toor` |
+| `-u, --url <url>` | Directives URL | Raw GitHub URL of the selected `.hdf` |
+| `-s, --server-ip <ip>` | Server IP | left blank |
+| `-w, --wallpaper <img>` | *(not prompted)* | `huronos-wallpaper.png` |
+| `-y, --yes, --force` | *(all of the above, non-interactive mode)* | off — prompts interactively |
+
+Run `bash 01-install-huronos.sh --help` for the full flag reference (including the positional-argument shorthand).
+
+> [!WARNING]
+> `--yes` auto-confirms the disk selection and **erases `--device` without asking again**. Double-check the device path — `lsblk` first — before running with `--yes`; there is no second confirmation prompt.
 
 ---
 
@@ -270,6 +305,69 @@ Because huronOS operates in isolated contest environments with strict firewalls 
    install-vsix-extensions
    ```
 5. **huronOS Module Registration:** Declared in directives (`AvailableSoftware`), `/etc/hmm/any`, and `/etc/hsync/all_software` for interoperability with the `hmm` manager.
+
+---
+
+## Build-Cache Container (`Containerfile.build-cache`)
+
+`01-install-huronos.sh` and `02-inject-custom-layer.sh` both look for the offline `.vsix`/`.deb`/`.tar.xz` inputs above (VS Code extensions, Noto Color Emoji/DejaVu/Inter fonts, Telegram Desktop) as local files first, and only fall back to downloading them from Debian/GitHub/Telegram mirrors if missing. Because these files are large binaries, `.gitignore` excludes them from the repo (`*.vsix`, `*.deb`, `*.tar.xz`) — `Containerfile.build-cache` packages them into a reusable [scratch](https://docs.docker.com/build/building/base-images/#create-a-minimal-base-image-using-scratch) image so a fresh clone (or a CI runner) doesn't have to re-download every package one file at a time, and stays usable even if one of those upstream mirrors goes away.
+
+```bash
+# Build the cache image (repo root, once — or whenever you update a .vsix/.deb/.tar.xz):
+podman build -f Containerfile.build-cache -t icpc-gpm-uaa-huronos/build-cache:latest .
+
+# Repopulate a fresh checkout that's missing these files:
+podman create --name gpm-cache-tmp icpc-gpm-uaa-huronos/build-cache:latest
+podman cp gpm-cache-tmp:/cache/. .
+podman rm gpm-cache-tmp
+```
+
+To hand the cache to another machine without git access, export/import it as a tarball: `podman save -o gpm-build-cache.tar icpc-gpm-uaa-huronos/build-cache:latest` on the source, `podman load -i gpm-build-cache.tar` on the destination, then repeat the `create`/`cp`/`rm` steps above. It can also be consumed directly as a build stage in another Containerfile via `COPY --from=icpc-gpm-uaa-huronos/build-cache:latest /cache/<file> .`
+
+**Not included:** `huronOS-alpha-0.4-amd64.iso` (separate `.gitignore` category, 5.3GB — see [ISO Checksum Verification](#iso-checksum-verification) to obtain/verify it) and `huronos-vm-disk.img` (ephemeral VM test disk regenerated on demand by `05-test-huronos-vm.sh`, not a build input).
+
+---
+
+## Telegram Desktop & MOJ Account Creation Bot
+
+To enable contestants to create their accounts on the MOJ platform before the contest starts:
+
+1. **Integrated Telegram Desktop:** Packaged directly in `/opt/telegram/Telegram` and as a huronOS module `huronOS/software/internet/telegram.hsm`.
+2. **Deep Link & Protocol Registration:** The `x-scheme-handler/tg` MIME scheme handler is pre-configured so that clicking the official MOJ bot URL:
+   ```text
+   https://t.me/mojinho_bot?start=978147e0-b481-45a5-979c-076f13cf5369
+   ```
+   or clicking the preloaded browser bookmark **MOJ Bot (Telegram)** directly launches the Telegram app with the token preloaded.
+3. **Availability Policy:** Active in `[Always]` and `[Event]` modes; disabled during `[Contest]` mode in accordance with contest rules.
+
+---
+
+## Preloaded Bookmarks & BOCA Fallback Judge
+
+All three modes (`[Always]`, `[Event]`, `[Contest]`) ship with the following browser bookmarks pre-configured in the `.hdf` directives, so contestants never have to type a judge URL by hand:
+
+| Bookmark | URL | Purpose |
+| --- | --- | --- |
+| MOJ Contest | `https://moj.naquadah.com.br` | Primary contest judge |
+| MOJ Ensaio | `https://ensaio-times-2026.moj.naquadah.com.br/` | MOJ rehearsal/practice mirror |
+| Guia MOJ | `https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en` | Contestant help guide |
+| MOJ Bot (Telegram) | `https://t.me/mojinho_bot?start=...` | MOJ account registration via Telegram bot |
+| **BOCA Juez (Fallback)** | `https://boca.icpcmexico.org` | Fallback judge, used only if MOJ becomes unreachable during the contest |
+| **BOCA Score (Fallback)** | `https://score.icpcmexico.org/` | Fallback scoreboard, paired with the BOCA fallback judge |
+| ICPC Mexico | `https://icpcmexico.org` | Regional ICPC Mexico portal |
+
+The BOCA bookmarks exist purely as a contingency: if `moj.naquadah.com.br` goes down mid-contest, organizers can redirect contestants to BOCA without needing to push a new directives file or reboot machines — the bookmark is already there.
+
+---
+
+## Full Emoji, Unicode & MOJ UI Font Rendering Support
+
+To solve missing Unicode symbol and emoji tofu boxes (`[]`) across MOJ contestant guides and documentation, and to match the MOJ platform's own typography:
+
+- **Noto Color Emoji (`NotoColorEmoji.ttf`):** Injected into `/usr/share/fonts/truetype/noto/` to render all standard Unicode emojis (`📖`, `👥`, `👤`, `👔`, `🎩`, `🎪`, `⚖️`, `👑`, etc.) in full color.
+- **DejaVu Sans (`DejaVuSans*.ttf`, incl. `DejaVuSansMono.ttf`):** Injected into `/usr/share/fonts/truetype/dejavu/` for complete Unicode symbol/typographic coverage and as the monospace fallback for MOJ's code/statement blocks (`--mono: "JetBrains Mono","Fira Mono","DejaVu Sans Mono",...`).
+- **Inter (`Inter-*.otf`):** Injected into `/usr/share/fonts/opentype/inter/` so MOJ's `font-family:"Inter"` UI text resolves to the actual typeface instead of silently falling back to `Segoe UI`/`Roboto` — MOJ ships no `@font-face`/webfont of its own for it.
+- **Fontconfig Configuration:** Configured in `/etc/fonts/conf.d/56-fonts-noto-color-emoji.conf` ensuring Chromium, Firefox, and system UI components resolve emoji codepoints immediately. Inter needs no alias — its OTF's internal family name already matches.
 
 ---
 

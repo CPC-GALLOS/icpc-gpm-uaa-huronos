@@ -9,8 +9,8 @@ ContestConfig=true
 [Always]
 AllowedWebsites=all
 AllowUsbStorage=true
-AvailableSoftware=internet/chromium|internet/crow|internet/firefox|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|programming/vsc-cpptools|programming/vsc-cph|programming/vsc-python|programming/vsc-java|
-Bookmarks={MOJ Contest^https://moj.naquadah.com.br}|{MOJ Ensaio^https://ensaio-times-2026.moj.naquadah.com.br/}|{Guia MOJ^https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en}|{ICPC Mexico^https://icpcmexico.org}|
+AvailableSoftware=internet/chromium|internet/crow|internet/firefox|internet/telegram|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|programming/vsc-cpptools|programming/vsc-cph|programming/vsc-python|programming/vsc-java|
+Bookmarks={MOJ Contest^https://moj.naquadah.com.br}|{MOJ Ensaio^https://ensaio-times-2026.moj.naquadah.com.br/}|{Guia MOJ^https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en}|{MOJ Bot (Telegram)^https://t.me/mojinho_bot?start=978147e0-b481-45a5-979c-076f13cf5369}|{BOCA Juez (Fallback)^https://boca.icpcmexico.org}|{BOCA Score (Fallback)^https://score.icpcmexico.org/}|{ICPC Mexico^https://icpcmexico.org}|
 # Set to 'default' to use the custom wallpaper baked into the USB, or specify a remote URL:
 Wallpaper=default
 WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
@@ -18,8 +18,8 @@ WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 [Event]
 AllowedWebsites=all
 AllowUsbStorage=true
-AvailableSoftware=internet/chromium|langs/g++|langs/gcc|langs/javac|langs/python3|tools/konsole|programming/vscode|programming/vsc-cpptools|programming/vsc-cph|programming/vsc-python|programming/vsc-java|
-Bookmarks={MOJ Contest^https://moj.naquadah.com.br}|{MOJ Ensaio^https://ensaio-times-2026.moj.naquadah.com.br/}|{Guia MOJ^https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en}|{ICPC Mexico^https://icpcmexico.org}|
+AvailableSoftware=internet/chromium|internet/telegram|langs/g++|langs/gcc|langs/javac|langs/python3|tools/konsole|programming/vscode|programming/vsc-cpptools|programming/vsc-cph|programming/vsc-python|programming/vsc-java|
+Bookmarks={MOJ Contest^https://moj.naquadah.com.br}|{MOJ Ensaio^https://ensaio-times-2026.moj.naquadah.com.br/}|{Guia MOJ^https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en}|{MOJ Bot (Telegram)^https://t.me/mojinho_bot?start=978147e0-b481-45a5-979c-076f13cf5369}|{BOCA Juez (Fallback)^https://boca.icpcmexico.org}|{BOCA Score (Fallback)^https://score.icpcmexico.org/}|{ICPC Mexico^https://icpcmexico.org}|
 Wallpaper=default
 WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 
@@ -27,7 +27,7 @@ WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 AllowedWebsites=all
 AllowUsbStorage=false
 AvailableSoftware=internet/chromium|internet/crow|internet/firefox|langs/g++|langs/gcc|langs/javac|langs/kotlinc|langs/pypy3|langs/python3|tools/konsole|programming/atom|programming/codeblocks|programming/eclipse|programming/emacs|programming/geany|programming/gedit|programming/gvim|programming/intellij|programming/kate|programming/kdevelop|programming/pycharm|programming/sublime|programming/vim|programming/vscode|programming/vsc-cpptools|programming/vsc-cph|programming/vsc-python|programming/vsc-java|
-Bookmarks={MOJ Contest^https://moj.naquadah.com.br}|{MOJ Ensaio^https://ensaio-times-2026.moj.naquadah.com.br/}|{Guia MOJ^https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en}|{ICPC Mexico^https://icpcmexico.org}|
+Bookmarks={MOJ Contest^https://moj.naquadah.com.br}|{MOJ Ensaio^https://ensaio-times-2026.moj.naquadah.com.br/}|{Guia MOJ^https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en}|{MOJ Bot (Telegram)^https://t.me/mojinho_bot?start=978147e0-b481-45a5-979c-076f13cf5369}|{BOCA Juez (Fallback)^https://boca.icpcmexico.org}|{BOCA Score (Fallback)^https://score.icpcmexico.org/}|{ICPC Mexico^https://icpcmexico.org}|
 Wallpaper=default
 WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 
@@ -35,3 +35,4 @@ WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 
 [Contest-Times]
 2026-08-27T00:00:00 2026-08-27T23:59:59
+

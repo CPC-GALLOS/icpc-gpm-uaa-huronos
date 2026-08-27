@@ -11,5 +11,7 @@
 # Ignore VM disk images
 *.img
 
-# ignore vsix files
+# ignore vsix, deb, and tar archives
 *.vsix
+*.deb
+*.tar.xz

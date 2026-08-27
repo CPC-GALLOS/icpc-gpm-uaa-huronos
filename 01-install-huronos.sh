@@ -2,9 +2,17 @@
 # =============================================================================
 # 01-install-huronos.sh — CPC GALLOS / UAA
 # Configures and installs huronOS onto a USB drive for ICPC contests.
-# Contest-specific settings are defined in the .hdf directives file.
+# Supports both interactive prompts and fully automated non-interactive CLI arguments.
 # =============================================================================
-# Usage: Run this script in your terminal:
+# Usage:
+#   # Non-interactive quick install (positional):
+#   bash 01-install-huronos.sh /dev/sdb
+#   bash 01-install-huronos.sh /dev/sdb [directives.hdf] [root_password] [directives_url] [server_ip] [wallpaper.png]
+#
+#   # Named flags:
+#   bash 01-install-huronos.sh -d /dev/sdb -c icpc-gpm-2026-3rd-date.hdf -p toor -u "https://..." -y
+#
+#   # Interactive mode:
 #   bash 01-install-huronos.sh
 # =============================================================================
 
@@ -14,7 +22,105 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 ISO_NAME="huronOS-alpha-0.4-amd64.iso"
 ISO_PATH="$SCRIPT_DIR/${ISO_NAME}"
 MOUNT_POINT="/media/iso"
-WALLPAPER_FILE="$SCRIPT_DIR/wallpaper.png"
+
+# Default configuration values
+TARGET_DEVICE=""
+HDF_INPUT=""
+ROOT_PASSWORD="toor"
+DIRECTIVES_URL=""
+SERVER_IP=""
+WALLPAPER_FILE=""
+NON_INTERACTIVE=false
+
+# Print usage help
+show_help() {
+    cat << 'EOF'
+huronOS USB Installer — CPC GALLOS / UAA
+
+Usage:
+  bash 01-install-huronos.sh [TARGET_DEV] [HDF_FILE] [PASSWORD] [DIRECTIVES_URL] [SERVER_IP] [WALLPAPER]
+  bash 01-install-huronos.sh [OPTIONS]
+
+Options:
+  -d, --device <dev>        Target block device (e.g. /dev/sdb)
+  -c, --config, --hdf <file> Directives .hdf file (default: icpc-gpm-2026-3rd-date.hdf)
+  -p, --password <pass>     Root user password (default: toor)
+  -u, --url <url>           Directives download URL (default: Raw GitHub repo URL)
+  -s, --server-ip <ip>      Directives sync server IP (optional)
+  -w, --wallpaper <img.png> Custom wallpaper image (default: huronos-wallpaper.png)
+  -y, --yes, --force        Non-interactive mode (auto-confirm device erase)
+  -h, --help                Show this help message
+
+Examples:
+  bash 01-install-huronos.sh /dev/sdb
+  bash 01-install-huronos.sh -d /dev/sdb -c icpc-gpm-2026-3rd-date.hdf -p toor -y
+EOF
+    exit 0
+}
+
+# Parse CLI arguments (flags or positional)
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -d|--device|--target)
+            TARGET_DEVICE="$2"
+            NON_INTERACTIVE=true
+            shift 2
+            ;;
+        -c|--config|--hdf)
+            HDF_INPUT="$2"
+            shift 2
+            ;;
+        -p|--password)
+            ROOT_PASSWORD="$2"
+            shift 2
+            ;;
+        -u|--url)
+            DIRECTIVES_URL="$2"
+            shift 2
+            ;;
+        -s|--server-ip)
+            SERVER_IP="$2"
+            shift 2
+            ;;
+        -w|--wallpaper)
+            WALLPAPER_FILE="$2"
+            shift 2
+            ;;
+        -y|--yes|-f|--force|--non-interactive)
+            NON_INTERACTIVE=true
+            shift
+            ;;
+        -*)
+            echo "❌ Error: Unknown option '$1'"
+            echo "Run 'bash $0 --help' for usage."
+            exit 1
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Handle positional arguments if flags were not used
+if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
+    if [[ "${POSITIONAL_ARGS[0]}" == /dev/* ]]; then
+        TARGET_DEVICE="${POSITIONAL_ARGS[0]}"
+        NON_INTERACTIVE=true
+        [ ${#POSITIONAL_ARGS[@]} -gt 1 ] && HDF_INPUT="${POSITIONAL_ARGS[1]}"
+        [ ${#POSITIONAL_ARGS[@]} -gt 2 ] && ROOT_PASSWORD="${POSITIONAL_ARGS[2]}"
+        [ ${#POSITIONAL_ARGS[@]} -gt 3 ] && DIRECTIVES_URL="${POSITIONAL_ARGS[3]}"
+        [ ${#POSITIONAL_ARGS[@]} -gt 4 ] && SERVER_IP="${POSITIONAL_ARGS[4]}"
+        [ ${#POSITIONAL_ARGS[@]} -gt 5 ] && WALLPAPER_FILE="${POSITIONAL_ARGS[5]}"
+    elif [[ "${POSITIONAL_ARGS[0]}" == *.hdf ]]; then
+        HDF_INPUT="${POSITIONAL_ARGS[0]}"
+        [ ${#POSITIONAL_ARGS[@]} -gt 1 ] && WALLPAPER_FILE="${POSITIONAL_ARGS[1]}"
+    fi
+fi
 
 # Locate ISO
 if [ ! -f "$ISO_PATH" ]; then
@@ -27,37 +133,45 @@ if [ ! -f "$ISO_PATH" ]; then
     fi
 fi
 
-# Locate directives file (generic: CLI arg, auto-discovery, or interactive menu)
-HDF_INPUT="$1"
+# Locate directives file
 HDF_FILE=""
-
 if [ -n "$HDF_INPUT" ] && [ -f "$HDF_INPUT" ]; then
     HDF_FILE="$(realpath "$HDF_INPUT")"
+elif [ -f "$SCRIPT_DIR/icpc-gpm-2026-3rd-date.hdf" ]; then
+    HDF_FILE="$SCRIPT_DIR/icpc-gpm-2026-3rd-date.hdf"
 else
     HDF_LIST=()
     while IFS= read -r -d $'\0' file; do
         HDF_LIST+=("$file")
-    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "*.hdf" -print0)
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "*.hdf" -print0 | sort -z)
 
     if [ ${#HDF_LIST[@]} -eq 1 ]; then
         HDF_FILE="${HDF_LIST[0]}"
     elif [ ${#HDF_LIST[@]} -gt 1 ]; then
-        echo "Multiple directives files found:"
-        for i in "${!HDF_LIST[@]}"; do
-            echo "  [$((i+1))] $(basename "${HDF_LIST[$i]}")"
-        done
-        read -r -p "Select directives configuration (1-${#HDF_LIST[@]}): " HDF_CHOICE
-        if [[ "$HDF_CHOICE" =~ ^[0-9]+$ ]] && [ "$HDF_CHOICE" -ge 1 ] && [ "$HDF_CHOICE" -le "${#HDF_LIST[@]}" ]; then
-            HDF_FILE="${HDF_LIST[$((HDF_CHOICE-1))]}"
-        else
-            echo "Using default: ${HDF_LIST[0]}"
+        if [ "$NON_INTERACTIVE" = true ]; then
             HDF_FILE="${HDF_LIST[0]}"
+        else
+            echo "Multiple directives files found:"
+            for i in "${!HDF_LIST[@]}"; do
+                echo "  [$((i+1))] $(basename "${HDF_LIST[$i]}")"
+            done
+            read -r -p "Select directives configuration (1-${#HDF_LIST[@]}, default 1): " HDF_CHOICE
+            if [[ "$HDF_CHOICE" =~ ^[0-9]+$ ]] && [ "$HDF_CHOICE" -ge 1 ] && [ "$HDF_CHOICE" -le "${#HDF_LIST[@]}" ]; then
+                HDF_FILE="${HDF_LIST[$((HDF_CHOICE-1))]}"
+            else
+                HDF_FILE="${HDF_LIST[0]}"
+            fi
         fi
     fi
 fi
 
-# Custom wallpaper source (optional)
-WALLPAPER_FILE="${2}"
+# Default Directives URL if unset
+if [ -z "$DIRECTIVES_URL" ] && [ -n "$HDF_FILE" ]; then
+    HDF_BASENAME="$(basename "$HDF_FILE")"
+    DIRECTIVES_URL="https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/$HDF_BASENAME"
+fi
+
+# Custom wallpaper source
 if [ -z "$WALLPAPER_FILE" ] || [ ! -f "$WALLPAPER_FILE" ]; then
     if [ -f "$SCRIPT_DIR/huronos-wallpaper.png" ]; then
         WALLPAPER_FILE="$SCRIPT_DIR/huronos-wallpaper.png"
@@ -72,15 +186,33 @@ echo "============================================="
 echo " huronOS Installer — CPC GALLOS / UAA"
 echo "============================================="
 echo "ISO Image:        $ISO_PATH"
-if [ -n "$HDF_FILE" ]; then
-    echo "Directives File:  $HDF_FILE ($(basename "$HDF_FILE"))"
-else
-    echo "Directives File:  None selected (will prompt during install)"
+[ -n "$TARGET_DEVICE" ] && echo "Target USB:       $TARGET_DEVICE"
+echo "Directives File:  ${HDF_FILE:-None selected} ($(basename "${HDF_FILE:-none}"))"
+echo "Directives URL:   ${DIRECTIVES_URL:-None}"
+echo "Root Password:    $ROOT_PASSWORD"
+if [ -n "$SERVER_IP" ]; then
+    echo "Sync Server IP:   $SERVER_IP"
 fi
-if [ -f "$WALLPAPER_FILE" ]; then
-    echo "Custom Wallpaper: $WALLPAPER_FILE ($(sha256sum "$WALLPAPER_FILE" | awk '{print $1}'))"
+if [ -n "$WALLPAPER_FILE" ] && [ -f "$WALLPAPER_FILE" ]; then
+    echo "Custom Wallpaper: $WALLPAPER_FILE"
 fi
+echo "============================================="
 echo ""
+
+# Safety check for host operating system disks
+if [ -n "$TARGET_DEVICE" ]; then
+    if [ ! -b "$TARGET_DEVICE" ]; then
+        echo "❌ Error: Specified target '$TARGET_DEVICE' is not a valid block device."
+        exit 1
+    fi
+    ROOT_MNT_DEV=$(findmnt -n -o SOURCE / 2>/dev/null || true)
+    ROOT_PARENT=$(lsblk -no PKNAME "$ROOT_MNT_DEV" 2>/dev/null || true)
+    if [ -n "$ROOT_PARENT" ] && [ "$TARGET_DEVICE" = "/dev/$ROOT_PARENT" ]; then
+        echo "❌ CRITICAL SAFETY ERROR: '$TARGET_DEVICE' contains the host OS root filesystem (/)."
+        echo "   Refusing to erase system drive."
+        exit 1
+    fi
+fi
 
 # --- Step 1: Check & install dependencies ---
 echo "[Step 1/9] Checking dependencies..."
@@ -113,7 +245,7 @@ echo ""
 
 # --- Step 2: Mask automounter ---
 echo "[Step 2/9] Masking udisks2 automounter..."
-sudo systemctl mask udisks2
+sudo systemctl mask udisks2 >/dev/null 2>&1 || true
 echo "✓ udisks2 masked (automount disabled)."
 echo ""
 
@@ -123,53 +255,71 @@ sudo mkdir -p "$MOUNT_POINT"
 sudo mount -o loop,ro "$ISO_PATH" "$MOUNT_POINT" 2>/dev/null || echo "(ISO already mounted, continuing...)"
 echo ""
 
-# Verify contents
-echo "ISO contents:"
-ls "$MOUNT_POINT"
-echo ""
+# --- Step 4: Prepare installer runner script ---
+INSTALL_TMP="/tmp/huronos-install-run-$$.sh"
+cp -f "$MOUNT_POINT/install.sh" "$INSTALL_TMP"
+chmod +x "$INSTALL_TMP"
 
-# --- Step 4: Directives reminder ---
-echo "============================================="
-echo " DIRECTIVES & WALLPAPER CONFIGURATION"
-echo "============================================="
-echo "Your directives file is at:"
-echo "  $HDF_FILE"
-echo ""
-echo "You can host it via GitHub Gist or Raw GitHub URL."
-echo "If you edit '$WALLPAPER_FILE', you can run './04-update-directives-wallpaper.sh'"
-echo "to calculate the SHA256 and update your directives file automatically."
-echo ""
-echo "If you don't have a URL yet, leave the directives URL blank during"
-echo "installation — you can configure it later in:"
-echo "  HURONOS/data/configs/sync-server.conf"
-echo "============================================="
-echo ""
-read -r -p "Press Enter to continue to installation..."
-echo ""
+# Patch ISO_DIR to absolute mount point
+sed -i "s|ISO_DIR=\"\$(dirname \"\$(readlink -f \"\$0\")\")\"|ISO_DIR=\"$MOUNT_POINT\"|" "$INSTALL_TMP"
+
+# If target device is explicitly provided, bypass interactive disk selection and prompt
+if [ -n "$TARGET_DEVICE" ]; then
+    # Inject exact target assignment and skip interactive prompts
+    sed -i "s|if \[ \"\$DEV_HOTPLUG\" = \"1\" \] && \[ \"\$DEV_TYPE\" = \"disk\" \]; then|if [ \"\$DEV_PATH\" = \"$TARGET_DEVICE\" ]; then|" "$INSTALL_TMP"
+    # Auto-confirm selection
+    sed -i 's|read -r -p "Please, select the disk where you want to install huronOS on: " SELECTION|SELECTION=0|g' "$INSTALL_TMP"
+    sed -i 's|read -r -p "The selected disk is.*do you want to continue? (Y/n) " CONFIRM|CONFIRM=Y|g' "$INSTALL_TMP"
+fi
+
+# In non-interactive mode, the sync server IP is genuinely optional (it's only
+# used to open a firewall exception for a local directives-sync server). Its
+# own [ -z "$DIRECTIVES_SERVER_IP" ] guard means there's no value we can pass
+# to make it skip its prompt when left blank on purpose, so bypass the read
+# outright and let it stay whatever was set via --server-ip (empty by default).
+if [ "$NON_INTERACTIVE" = true ]; then
+    sed -i 's|read -r -p "IP of the sync server:" DIRECTIVES_SERVER_IP|: # non-interactive: DIRECTIVES_SERVER_IP left as-is|' "$INSTALL_TMP"
+fi
+
+# Export configuration variables for the installer
+export NEW_PASSWORD="$ROOT_PASSWORD"
+export DIRECTIVES_FILE_URL="$DIRECTIVES_URL"
+export DIRECTIVES_SERVER_IP="$SERVER_IP"
+
+# install.sh's own arg parser unconditionally resets NEW_PASSWORD="" before
+# ever looking at the environment, so the export above is silently clobbered
+# and it falls back to an interactive prompt. It only honors the password
+# (and directives URL/IP) via explicit CLI flags, so pass those too.
+INSTALL_ARGS=(--root-password "$ROOT_PASSWORD")
+[ -n "$DIRECTIVES_URL" ] && INSTALL_ARGS+=(--directives-url "$DIRECTIVES_URL")
+[ -n "$SERVER_IP" ] && INSTALL_ARGS+=(--directives-server-ip "$SERVER_IP")
 
 # --- Step 5: Run the installer ---
 echo "[Step 5/9] Running huronOS installer..."
-echo ""
-echo "⚠  WARNING: The installer will ask you to select a target disk."
-echo "⚠  Double-check your USB device before confirming! ALL DATA WILL BE ERASED."
-echo ""
 cd "$MOUNT_POINT"
-sudo ./install.sh
+sudo -E bash "$INSTALL_TMP" "${INSTALL_ARGS[@]}"
 cd "$SCRIPT_DIR"
+rm -f "$INSTALL_TMP"
 echo ""
 echo "✓ Base installer finished."
 echo ""
 
-# --- Step 6: Inject custom wallpaper, graphics fallback, and VS Code extensions ---
-echo "[Step 6/9] Injecting custom wallpaper, graphics fallback, and VS Code extensions..."
-sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "" "$WALLPAPER_FILE" "$HDF_FILE" || {
+# Determine target partition for layer injection
+INJECT_TARGET=""
+if [ -n "$TARGET_DEVICE" ]; then
+    INJECT_TARGET="${TARGET_DEVICE}1"
+fi
+
+# --- Step 6: Inject custom wallpaper, fonts, Telegram, and VS Code extensions ---
+echo "[Step 6/9] Injecting custom wallpaper, Noto Color Emoji fonts, Telegram Desktop, and VS Code extensions..."
+sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "$INJECT_TARGET" "$WALLPAPER_FILE" "$HDF_FILE" || {
     echo "⚠️ Warning: Custom layer injection encountered an issue, continuing..."
 }
 echo ""
 
 # --- Step 7: Configure NVIDIA Bootloader compatibility ---
-echo "[Step 7/9] Configuring NVIDIA Safe Graphics / nomodeset boot options..."
-sudo bash "$SCRIPT_DIR/03-configure-nvidia-boot.sh" || {
+echo "[Step 7/9] Configuring NVIDIA Safe Graphics / UEFI boot options..."
+sudo bash "$SCRIPT_DIR/03-configure-nvidia-boot.sh" "$INJECT_TARGET" || {
     echo "⚠️ Warning: NVIDIA boot configuration encountered an issue, continuing..."
 }
 echo ""
@@ -193,13 +343,21 @@ echo ""
 echo "[Step 9/9] Cleaning up..."
 cd /
 sudo umount "$MOUNT_POINT" 2>/dev/null || true
-sudo systemctl unmask udisks2
-sudo systemctl start udisks2
+sudo systemctl unmask udisks2 >/dev/null 2>&1 || true
+sudo systemctl start udisks2 >/dev/null 2>&1 || true
 echo "✓ Cleanup complete."
 echo ""
 
 echo "============================================="
 echo " ✓ huronOS INSTALLATION COMPLETE"
+echo "============================================="
+echo "Target Device:  ${TARGET_DEVICE:-Auto-detected USB}"
+echo "Directives:     ${HDF_FILE:-Default}"
+echo "Directives URL: $DIRECTIVES_URL"
+echo "Root Password:  $ROOT_PASSWORD"
+echo "Emojis/Fonts:   Noto Color Emoji & DejaVu installed"
+echo "Telegram:       Installed & registered (active in Always & Event modes)"
+echo "Extensions:     CPH, C++, Python & Java installed"
 echo "============================================="
 echo ""
 echo "Next steps:"
@@ -209,9 +367,4 @@ echo "  3. Enter BIOS boot menu (F12/F2/Del)"
 echo "  4. Disable Secure Boot if UEFI"
 echo "  5. Boot from USB"
 echo "  6. huronOS auto-boots to contestant desktop"
-echo "Judge (MOJ):  https://moj.naquadah.com.br"
-echo "Ensaio:       https://ensaio-times-2026.moj.naquadah.com.br/"
-echo "Guía:         https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en"
-echo ""
-echo "Check your .hdf directives file for contest-specific times and settings."
 echo ""

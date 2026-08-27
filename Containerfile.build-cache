@@ -1,0 +1,46 @@
+# =============================================================================
+# Containerfile.build-cache — CPC GALLOS / UAA
+#
+# Packages the large, gitignored build-time input artifacts that
+# 01-install-huronos.sh and 02-inject-custom-layer.sh look for locally
+# (VS Code offline extensions, offline font packages, offline Telegram
+# Desktop tarball) into a single reusable cache image.
+#
+# These files are excluded from git via .gitignore (*.vsix, *.deb, *.tar.xz)
+# because of their size. This image is the reproducible substitute: a fresh
+# clone of the repo (or a CI runner) can pull/extract this cache instead of
+# re-downloading every package one file at a time from Debian/GitHub/Telegram
+# mirrors, and stays usable even if one of those upstream mirrors goes away.
+#
+# NOT included (different .gitignore categories, not build-cache inputs):
+#   - huronOS-alpha-0.4-amd64.iso  (*.iso; 5.3GB base ISO — see README.md
+#     "ISO Checksum Verification" for how to obtain/verify it separately)
+#   - huronos-vm-disk.img          (*.img; ephemeral VM test disk, regenerated
+#     on demand by 05-test-huronos-vm.sh — not a build input)
+#
+# Build:
+#   podman build -f Containerfile.build-cache -t icpc-gpm-uaa-huronos/build-cache:latest .
+#
+# Extract the cache back onto a fresh checkout (run from the repo root):
+#   podman create --name gpm-cache-tmp icpc-gpm-uaa-huronos/build-cache:latest
+#   podman cp gpm-cache-tmp:/cache/. .
+#   podman rm gpm-cache-tmp
+#
+# Or consume individual files as a build stage in another Containerfile:
+#   COPY --from=icpc-gpm-uaa-huronos/build-cache:latest /cache/fonts-inter.deb .
+# =============================================================================
+
+FROM scratch AS build-cache
+
+# VS Code offline extensions (VSCodium marketplace is unreachable in-contest)
+COPY competitive-programming-helper-2077.0.0.vsix /cache/
+COPY ms-python.python-2023.14.0.vsix              /cache/
+COPY redhat.java-1.40.0.vsix                      /cache/
+
+# Offline font packages (Noto Color Emoji, DejaVu Sans/Mono, Inter UI)
+COPY fonts-noto-color-emoji.deb                   /cache/
+COPY fonts-dejavu-core.deb                        /cache/
+COPY fonts-inter.deb                              /cache/
+
+# Offline Telegram Desktop standalone binary tarball
+COPY tsetup.tar.xz                                /cache/
