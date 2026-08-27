@@ -13,6 +13,19 @@ set -e
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 TARGET="${1}"
 WALLPAPER_SRC="${2}"
+HDF_SRC="${3}"
+
+if [ -n "$HDF_SRC" ] && [ ! -f "$HDF_SRC" ]; then
+    echo "⚠️ Warning: Specified directives file '$HDF_SRC' not found."
+    HDF_SRC=""
+fi
+if [ -z "$HDF_SRC" ]; then
+    if [ -f "$SCRIPT_DIR/icpc-test-2026-08-26.hdf" ]; then
+        HDF_SRC="$SCRIPT_DIR/icpc-test-2026-08-26.hdf"
+    elif [ -f "$SCRIPT_DIR/icpc-gpm-2026-3rd-date.hdf" ]; then
+        HDF_SRC="$SCRIPT_DIR/icpc-gpm-2026-3rd-date.hdf"
+    fi
+fi
 
 if [ -z "$WALLPAPER_SRC" ] || [ ! -f "$WALLPAPER_SRC" ]; then
     if [ -f "$SCRIPT_DIR/huronos-wallpaper.png" ]; then
@@ -34,6 +47,8 @@ WALLPAPER_SHA=$(sha256sum "$WALLPAPER_SRC" | awk '{print $1}')
 FILE_INFO=$(file "$WALLPAPER_SRC")
 FBDEV_DEB_URL="https://deb.debian.org/debian/pool/main/x/xserver-xorg-video-fbdev/xserver-xorg-video-fbdev_0.5.0-1_amd64.deb"
 FBDEV_DEB_SHA256="cccf3792ff2b6c95b55269b67ca7c5213a00561711fe8d10e5436961faf5d9d9"
+SPICE_VDAGENT_DEB_URL="https://deb.debian.org/debian/pool/main/s/spice-vdagent/spice-vdagent_0.20.0-2_amd64.deb"
+SPICE_VDAGENT_DEB_SHA256="19800ed07b2b4d1fe65eb1b20affdc14132fc712da0b9577560482a7a9c48aa8"
 
 # Extension definitions: MODULE_ID | DEFAULT_NAME | FALLBACK_URL | LOCAL_CANDIDATE_PATTERNS
 EXT_CONFIGS=(
@@ -45,6 +60,9 @@ EXT_CONFIGS=(
 echo "✓ Wallpaper source: $WALLPAPER_SRC"
 echo "  Type:   $FILE_INFO"
 echo "  SHA256: $WALLPAPER_SHA"
+if [ -n "$HDF_SRC" ] && [ -f "$HDF_SRC" ]; then
+    echo "✓ Directives source: $HDF_SRC"
+fi
 echo ""
 
 # Determine target mount point or device
@@ -149,6 +167,12 @@ echo "Injecting wallpaper as /usr/share/backgrounds/huronos-background.png..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/backgrounds"
 cp -f "$WALLPAPER_SRC" "$TMP_LAB/squashfs-root/usr/share/backgrounds/huronos-background.png"
 
+if [ -n "$HDF_SRC" ] && [ -f "$HDF_SRC" ]; then
+    echo "Injecting directives into 05-custom.hsl (/etc/hsync/directives)..."
+    mkdir -p "$TMP_LAB/squashfs-root/etc/hsync"
+    cp -f "$HDF_SRC" "$TMP_LAB/squashfs-root/etc/hsync/directives"
+fi
+
 echo "Configuring Xorg display and Mesa fallback in 05-custom.hsl..."
 mkdir -p "$TMP_LAB/squashfs-root/usr/share/X11/xorg.conf.d"
 mkdir -p "$TMP_LAB/squashfs-root/etc/alternatives"
@@ -168,6 +192,21 @@ echo "$FBDEV_DEB_SHA256  $TMP_LAB/fbdev.deb" | sha256sum -c -
 )
 install -m 0755 "$TMP_LAB/fbdev-package/usr/lib/xorg/modules/drivers/fbdev_drv.so" \
     "$TMP_LAB/squashfs-root/usr/lib/xorg/modules/drivers/fbdev_drv.so"
+
+echo "Downloading Debian SPICE Guest Agent (spice-vdagent) for KVM/SPICE integration..."
+mkdir -p "$TMP_LAB/spice-package"
+if curl -fsSL --retry 2 -o "$TMP_LAB/spice-vdagent.deb" "$SPICE_VDAGENT_DEB_URL"; then
+    if echo "$SPICE_VDAGENT_DEB_SHA256  "$TMP_LAB/spice-vdagent.deb"" | sha256sum -c - >/dev/null 2>&1; then
+        (
+            cd "$TMP_LAB/spice-package"
+            ar x "$TMP_LAB/spice-vdagent.deb"
+            tar -xJf data.tar.xz -C "$TMP_LAB/squashfs-root/" ./usr/bin/spice-vdagent ./usr/sbin/spice-vdagentd ./lib/systemd/system/spice-vdagentd.service ./lib/systemd/system/spice-vdagentd.socket ./etc/xdg/autostart/spice-vdagent.desktop ./lib/udev/rules.d/70-spice-vdagentd.rules 2>/dev/null || true
+        )
+        mkdir -p "$TMP_LAB/squashfs-root/etc/systemd/system/sockets.target.wants"
+        ln -sf /lib/systemd/system/spice-vdagentd.socket "$TMP_LAB/squashfs-root/etc/systemd/system/sockets.target.wants/spice-vdagentd.socket" 2>/dev/null || true
+        echo "✓ Injected SPICE vdagent (auto-resolution & clipboard sharing enabled)"
+    fi
+fi
 
 cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-display.conf"
 # Linux 6.0 in huronOS alpha 0.4 has no KMS driver for Intel Arrow Lake.
@@ -292,9 +331,6 @@ EOF
         # Inject into 05-custom.hsl tree
         mkdir -p "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/$EXT_DIR_NAME"
         cp -rf "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/"* "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/$EXT_DIR_NAME/"
-        if [ -f "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/.vsixmanifest" ]; then
-            cp -f "$EXT_ROOT/opt/codium/contestant/extensions/$EXT_DIR_NAME/.vsixmanifest" "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/$EXT_DIR_NAME/"
-        fi
         cp -f "$EXT_ROOT/opt/codium/contestant/extensions/ids/${MOD_ID}.json" "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions/ids/${MOD_ID}.json"
 
         # Build standalone .hsm module
@@ -303,7 +339,8 @@ EOF
             echo "  Building standalone module: $HSM_FILE"
             TMP_HSM="$TMP_LAB/${MOD_ID}.hsm"
             rm -f "$TMP_HSM"
-            mksquashfs "$EXT_ROOT" "$TMP_HSM" -comp xz -b 1024K -always-use-fragments -noappend >/dev/null
+            NPROCS=$(nproc 2>/dev/null || echo 4)
+            mksquashfs "$EXT_ROOT" "$TMP_HSM" -comp xz -b 256K -processors "$NPROCS" -always-use-fragments -noappend >/dev/null
             cp -f "$TMP_HSM" "$HSM_FILE"
             GENERATED_HSMS+=("${MOD_ID}.hsm")
         fi
@@ -467,7 +504,8 @@ chmod -R 777 "$TMP_LAB/squashfs-root/home/contestant/vsix" 2>/dev/null || true
 
 echo "Building updated 05-custom.hsl squashfs layer..."
 rm -f "$TMP_LAB/05-custom.hsl"
-mksquashfs "$TMP_LAB/squashfs-root" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -always-use-fragments -noappend >/dev/null
+NPROCS=$(nproc 2>/dev/null || echo 4)
+mksquashfs "$TMP_LAB/squashfs-root" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -processors "$NPROCS" -always-use-fragments -noappend >/dev/null
 
 cp -f "$TMP_LAB/05-custom.hsl" "$CUSTOM_HSL"
 rm -rf "$TMP_LAB"
@@ -495,6 +533,27 @@ if [ "$WALL_EXT" != "png" ]; then
     copy_wallpaper_if_needed "$DATA_BACKUPS_DIR/Contest-mode-wallpaper.png"
 fi
 echo "✓ Pre-seeded Always, Event, and Contest mode wallpapers in huronOS/data/backups/"
+
+if [ -n "$HDF_SRC" ] && [ -f "$HDF_SRC" ]; then
+    cp -f "$HDF_SRC" "$DATA_BACKUPS_DIR/directives"
+    CONF_DIR="$TARGET_DIR/huronOS/data/configs"
+    [ ! -d "$CONF_DIR" ] && CONF_DIR="$TARGET_DIR/data/configs"
+    if [ -d "$CONF_DIR" ]; then
+        if [ ! -f "$CONF_DIR/sync-server.conf" ] || ! grep -q "DIRECTIVES_FILE_URL=" "$CONF_DIR/sync-server.conf"; then
+            cat <<EOF > "$CONF_DIR/sync-server.conf"
+[Server]
+INSTANCE_IP_ADDRESS=
+INSTANCE_IP_MASK=
+INSTANCE_IP_GATEWAY=
+DIRECTIVES_ENDPOINT=
+SERVER_ROOM=
+DIRECTIVES_FILE_URL=http://192.168.122.1:8000/$(basename "$HDF_SRC")
+DIRECTIVES_SERVER_IP=192.168.122.1
+EOF
+        fi
+    fi
+    echo "✓ Pre-seeded directives in huronOS/data/backups/directives"
+fi
 
 # Update checksums file if present
 if [ -f "$CHECKSUMS_FILE" ]; then

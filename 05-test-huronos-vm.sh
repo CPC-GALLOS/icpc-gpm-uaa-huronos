@@ -1,22 +1,34 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 # =============================================================================
 # 05-test-huronos-vm.sh — CPC GALLOS / UAA
 # Creates a virtual disk image, installs huronOS onto it via loop device,
 # and boots a KVM VM to test directives, firewall, and software modules.
 # =============================================================================
 # Usage:
-#   bash 05-test-huronos-vm.sh
+#   bash 05-test-huronos-vm.sh [directives.hdf] [wallpaper.png]
 # =============================================================================
 
 set -e
 
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 ISO_NAME="huronOS-alpha-0.4-amd64.iso"
-ISO_PATH="./${ISO_NAME}"
-DISK_IMG="./huronos-vm-disk.img"
+ISO_PATH="$SCRIPT_DIR/${ISO_NAME}"
+
+# Storage location for VM disk (configurable via VM_DISK_DIR or VM_DISK_PATH)
+if [ -n "$VM_DISK_PATH" ]; then
+    DISK_IMG="$VM_DISK_PATH"
+elif [ -n "$VM_DISK_DIR" ]; then
+    mkdir -p "$VM_DISK_DIR"
+    DISK_IMG="$VM_DISK_DIR/huronos-vm-disk.img"
+else
+    DISK_IMG="$SCRIPT_DIR/huronos-vm-disk.img"
+fi
+
 DISK_SIZE="16G"
 VM_NAME="huronOS-Test-VM"
 MOUNT_POINT="/media/iso"
 LOOP_DEV=""
+HTTP_SERVER_PID=""
 
 cleanup() {
     echo ""
@@ -36,6 +48,67 @@ trap cleanup EXIT INT TERM
 echo "============================================="
 echo " huronOS KVM / virt-manager Test Environment"
 echo "============================================="
+echo ""
+
+# Locate Directives File
+HDF_INPUT="${1}"
+HDF_FILE=""
+
+if [ -n "$HDF_INPUT" ] && [ -f "$HDF_INPUT" ]; then
+    HDF_FILE="$(realpath "$HDF_INPUT")"
+else
+    HDF_LIST=()
+    while IFS= read -r -d $'\0' file; do
+        HDF_LIST+=("$file")
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name "*.hdf" -print0 | sort -z)
+
+    if [ ${#HDF_LIST[@]} -eq 1 ]; then
+        HDF_FILE="${HDF_LIST[0]}"
+    elif [ ${#HDF_LIST[@]} -gt 1 ]; then
+        echo "Multiple directives files found:"
+        DEFAULT_IDX=0
+        for i in "${!HDF_LIST[@]}"; do
+            FNAME="$(basename "${HDF_LIST[$i]}")"
+            echo "  [$((i+1))] $FNAME"
+            if [ "$FNAME" = "icpc-gpm-2026-3rd-date.hdf" ]; then
+                DEFAULT_IDX=$i
+            fi
+        done
+        read -r -p "Select directives configuration (1-${#HDF_LIST[@]}, default: $((DEFAULT_IDX+1))): " HDF_CHOICE
+        if [[ "$HDF_CHOICE" =~ ^[0-9]+$ ]] && [ "$HDF_CHOICE" -ge 1 ] && [ "$HDF_CHOICE" -le "${#HDF_LIST[@]}" ]; then
+            HDF_FILE="${HDF_LIST[$((HDF_CHOICE-1))]}"
+        else
+            HDF_FILE="${HDF_LIST[$DEFAULT_IDX]}"
+        fi
+    fi
+fi
+
+# Locate Wallpaper
+VM_WALLPAPER="${2}"
+if [ -z "$VM_WALLPAPER" ] || [ ! -f "$VM_WALLPAPER" ]; then
+    if [ -f "$SCRIPT_DIR/huronos-wallpaper.png" ]; then
+        VM_WALLPAPER="$SCRIPT_DIR/huronos-wallpaper.png"
+    elif [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
+        VM_WALLPAPER="$SCRIPT_DIR/wallpaper.png"
+    else
+        VM_WALLPAPER=$(find "$SCRIPT_DIR" -maxdepth 1 \( -name "*wallpaper*.png" -o -name "*wallpaper*.jpg" -o -name "*wallpaper*.jpeg" \) 2>/dev/null | head -n 1 || true)
+    fi
+fi
+
+# Resolve host bridge IP for sync server URL display
+HOST_IP=$(ip -4 addr show virbr0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || true)
+if [ -z "$HOST_IP" ]; then
+    HOST_IP="192.168.122.1"
+fi
+
+echo "Directives File:  ${HDF_FILE:-None selected}"
+if [ -n "$HDF_FILE" ]; then
+    echo "  Local HTTP URL: http://${HOST_IP}:8000/$(basename "$HDF_FILE")"
+    echo "  Sync Server IP: ${HOST_IP}"
+fi
+if [ -n "$VM_WALLPAPER" ] && [ -f "$VM_WALLPAPER" ]; then
+    echo "Wallpaper:        $VM_WALLPAPER"
+fi
 echo ""
 
 # Check KVM availability
@@ -73,11 +146,11 @@ fi
 
 # Check ISO file
 if [ ! -f "$ISO_PATH" ]; then
-    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "/home/ravary/Desktop/website" "/home/ravary/d/VM" "$HOME/Downloads" -maxdepth 2 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
+    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "$HOME/Downloads" "$HOME/VM" -maxdepth 2 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
     if [ -n "$ISO_CANDIDATE" ] && [ -f "$ISO_CANDIDATE" ]; then
         ISO_PATH="$ISO_CANDIDATE"
     else
-        echo "❌ Error: ${ISO_NAME} not found at ${ISO_PATH}, ~/Desktop/website/, or ~/d/VM/"
+        echo "❌ Error: ${ISO_NAME} not found at ${ISO_PATH}, $HOME/Downloads/, or $HOME/VM/"
         echo "   Please download it from https://mirrors.huronos.org/huronOS/alpha/huronOS-alpha-0.4-amd64.iso"
         echo "   and place it in the current directory."
         exit 1
@@ -85,6 +158,15 @@ if [ ! -f "$ISO_PATH" ]; then
 fi
 echo "✓ ISO found: $ISO_PATH"
 echo ""
+
+# Start background local HTTP server if needed
+if ! ss -tulpn 2>/dev/null | grep -q ":8000 "; then
+    echo "Starting local HTTP directives server on port 8000..."
+    (cd "$SCRIPT_DIR" && python3 -m http.server 8000 --bind 0.0.0.0 >/dev/null 2>&1) &
+    HTTP_SERVER_PID=$!
+    echo "✓ Local HTTP server running (PID $HTTP_SERVER_PID)"
+    echo ""
+fi
 
 # Check if disk image exists
 SKIP_INSTALL=false
@@ -137,6 +219,12 @@ if [ "$SKIP_INSTALL" != "true" ]; then
     echo "============================================="
     echo "⚠️  When asked to select a target disk:"
     echo "    Select the loop device: $LOOP_DEV (usually option 0)"
+    if [ -n "$HDF_FILE" ]; then
+        echo ""
+        echo "ℹ️  Directives suggestions during prompt:"
+        echo "    URL: http://${HOST_IP}:8000/$(basename "$HDF_FILE")"
+        echo "    IP:  ${HOST_IP}"
+    fi
     echo "============================================="
     echo ""
     read -r -p "Press Enter to start installer..."
@@ -147,23 +235,16 @@ if [ "$SKIP_INSTALL" != "true" ]; then
     cd - >/dev/null
     rm -f /tmp/install-patched.sh
 
-    # Inject custom wallpaper if present
-    SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-    VM_WALLPAPER="${1}"
-    if [ -z "$VM_WALLPAPER" ] || [ ! -f "$VM_WALLPAPER" ]; then
-        if [ -f "$SCRIPT_DIR/huronos-wallpaper.png" ]; then
-            VM_WALLPAPER="$SCRIPT_DIR/huronos-wallpaper.png"
-        elif [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
-            VM_WALLPAPER="$SCRIPT_DIR/wallpaper.png"
-        else
-            VM_WALLPAPER=$(find "$SCRIPT_DIR" -maxdepth 1 \( -name "*wallpaper*.png" -o -name "*wallpaper*.jpg" -o -name "*wallpaper*.jpeg" \) 2>/dev/null | head -n 1 || true)
-        fi
-    fi
+    echo ""
+    echo "[Step 4.8/6] Injecting custom wallpaper, directives, and VS Code extensions into VM disk image..."
+    sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "${LOOP_DEV}p1" "$VM_WALLPAPER" "$HDF_FILE" || {
+        echo "⚠️ Warning: Custom layer injection encountered an issue, continuing..."
+    }
 
     echo ""
-    echo "[Step 4.8/6] Injecting custom wallpaper ($VM_WALLPAPER), graphics fallback, and VS Code extensions into VM disk image..."
-    sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "${LOOP_DEV}p1" "$VM_WALLPAPER" || {
-        echo "⚠️ Warning: Custom layer injection encountered an issue, continuing..."
+    echo "[Step 4.9/6] Configuring bootloader for VM graphics compatibility..."
+    sudo bash "$SCRIPT_DIR/03-configure-nvidia-boot.sh" "${LOOP_DEV}p1" || {
+        echo "⚠️ Warning: Bootloader configuration encountered an issue, continuing..."
     }
 
     echo ""
@@ -196,6 +277,8 @@ sudo virt-install \
   --network network=default \
   --graphics spice,listen=127.0.0.1 \
   --video qxl \
+  --channel spicevmc,target_type=virtio,name=com.redhat.spice.0 \
+  --channel unix,target_type=virtio,name=org.qemu.guest_agent.0 \
   --noautoconsole || {
     echo "virt-install completed."
 }
@@ -210,7 +293,7 @@ echo "You can manage and view the VM using virt-manager:"
 echo "  virt-manager"
 echo ""
 echo "Or connect directly via virt-viewer:"
-echo "  virt-viewer $VM_NAME"
+echo "  virt-viewer -c qemu:///system $VM_NAME"
 echo ""
 echo "To stop and remove the VM:"
 echo "  sudo virsh destroy $VM_NAME"

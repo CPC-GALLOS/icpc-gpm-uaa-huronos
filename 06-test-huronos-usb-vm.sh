@@ -10,7 +10,20 @@
 set -e
 
 VM_NAME="huronOS-USB-VM"
-TARGET_DEV="${1:-/dev/sdb}"
+TARGET_INPUT="${1}"
+TARGET_DEV=""
+
+if [ -n "$TARGET_INPUT" ]; then
+    TARGET_DEV="$TARGET_INPUT"
+else
+    # Auto-detect removable USB block device
+    DETECTED_USB=$(lsblk -d -n -r -o NAME,RM,TRAN 2>/dev/null | grep -E "(usb|1)" | awk '{print "/dev/"$1}' | head -n 1 || true)
+    if [ -n "$DETECTED_USB" ] && [ -b "$DETECTED_USB" ]; then
+        TARGET_DEV="$DETECTED_USB"
+    else
+        TARGET_DEV="/dev/sdb"
+    fi
+fi
 
 echo "============================================="
 echo " huronOS Physical USB KVM Test VM"
@@ -26,8 +39,8 @@ fi
 
 # Check target device
 if [ ! -b "$TARGET_DEV" ]; then
-    echo "❌ Error: Block device '$TARGET_DEV' does not exist."
-    echo "Available drives:"
+    echo "❌ Error: Block device '$TARGET_DEV' not found."
+    echo "Detected storage drives:"
     lsblk -d -o NAME,SIZE,MODEL,TRAN,RM
     echo ""
     echo "Usage: bash 06-test-huronos-usb-vm.sh /dev/sdX"

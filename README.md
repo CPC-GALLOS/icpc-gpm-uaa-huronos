@@ -1,60 +1,63 @@
 # icpc-gpm-uaa-huronos
 
-Instalación, configuración y soluciones de compatibilidad de [huronOS](https://huronos.org) para los equipos de la **Universidad Autónoma de Aguascalientes (UAA)** en el **ICPC Gran Premio de México**.
+Installation, configuration, and hardware compatibility solutions for [huronOS](https://huronos.org) deployed at **Universidad Autónoma de Aguascalientes (UAA)** for the **ICPC Gran Premio de México**.
 
-- 🏆 **Juez del concurso:** [MOJ](https://moj.naquadah.com.br) | [Ensaio](https://ensaio-times-2026.moj.naquadah.com.br/) | [Guía del competidor](https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en)
-- 💿 **ISO Base:** `huronOS-alpha-0.4-amd64.iso` (Debian 11 / Kernel Linux 6.0.15)
-- 🏢 **Sede:** Laboratorios de Cómputo, Universidad Autónoma de Aguascalientes
+- 🏆 **Contest Judge:** [MOJ](https://moj.naquadah.com.br) | [Ensaio](https://ensaio-times-2026.moj.naquadah.com.br/) | [Contestant Guide](https://moj.naquadah.com.br/contest/ajuda/competidor.html?lang=en)
+- 💿 **Base ISO:** `huronOS-alpha-0.4-amd64.iso` (Debian 11 / Linux Kernel 6.0.15)
+- 🏢 **Venue:** Computer Laboratories, Universidad Autónoma de Aguascalientes
 
 ---
 
-## Estructura del Repositorio y Scripts Numerados
+## Repository Structure & Numbered Scripts
 
-Los scripts están organizados y numerados cronológicamente según su orden de ejecución:
+Scripts are organized and numbered chronologically according to execution workflow:
 
 ```text
 icpc-gpm-uaa-huronos/
-├── 01-install-huronos.sh               # [Paso 1] Instalación base en USB (incluye pasos 2 y 3 automáticamente)
-├── 02-inject-custom-layer.sh           # [Paso 2] Inyección en 05-custom.hsl (Wallpaper, Driver fbdev, Mesa & CPH)
-├── 02b-inject-vscode-extensions.sh     # [Auxiliar] Inyector independiente de extensiones VS Code (CPH & C++)
-├── 03-configure-nvidia-boot.sh         # [Paso 3] Ajuste de bootloader para hardware 2024 y GPUs NVIDIA
-├── 04-update-directives-wallpaper.sh   # [Utilidad] Calcula SHA256 de fondos y actualiza archivos .hdf
-├── 05-test-huronos-vm.sh               # [Pruebas] Creación y prueba local en Máquina Virtual KVM / virt-manager
-├── 06-test-huronos-usb-vm.sh           # [Pruebas] Arranque directo de memoria USB física en KVM / virt-viewer
-├── competitive-programming-helper-*.vsix # Paquete de extensión CPH para VS Code
-├── huronos-wallpaper.png               # Wallpaper oficial personalizado para el concurso (1920×1080)
-├── *.hdf                               # Archivos de directivas por concurso
-├── .gitignore                          # Ignora ISOs, imágenes VM y archivos binarios vsix
-├── AGENTS.md                           # Contexto técnico para asistentes IA
-└── README.md                           # Documentación técnica completa
+├── 01-install-huronos.sh               # [Step 1] Base USB installer (automatically chains steps 2 and 3)
+├── 02-inject-custom-layer.sh           # [Step 2] Injects 05-custom.hsl (Wallpaper, fbdev driver, Mesa, SPICE & extensions)
+├── 02b-inject-vscode-extensions.sh     # [Helper] Standalone VS Code extension injector (CPH, C++, Python, Java)
+├── 03-configure-nvidia-boot.sh         # [Step 3] Bootloader configuration for 2024 hardware and NVIDIA GPUs
+├── 04-update-directives-wallpaper.sh   # [Utility] Computes wallpaper SHA256 hashes and updates .hdf files
+├── 05-test-huronos-vm.sh               # [VM - DEFAULT] Creates and runs local VM in KVM / virt-manager (with SPICE vdagent)
+├── 06-test-huronos-usb-vm.sh           # [VM - KVM USB] Direct physical USB boot in KVM / virt-viewer
+├── 07-test-huronos-vbox.sh             # [VM - OPTIONAL] Converts disk to VDI and boots inside Oracle VirtualBox
+├── competitive-programming-helper-*.vsix # Offline CPH extension package for VS Code
+├── ms-python.python-*.vsix             # Offline Python extension package for VS Code
+├── redhat.java-*.vsix                  # Offline Java language support package for VS Code
+├── huronos-wallpaper.png               # Official custom contest wallpaper (1920×1080)
+├── *.hdf                               # Contest directives configuration files
+├── .gitignore                          # Ignores ISOs, VM disk images, and binary artifacts
+├── AGENTS.md                           # AI assistant technical context
+└── README.md                           # Comprehensive technical documentation
 ```
 
-### Directivas de concurso
+### Contest Directives
 
-| Archivo | Concurso | Fecha y Horario | URL Directivas |
+| File | Contest | Date & Schedule | Directives URL |
 | --- | --- | --- | --- |
-| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3ra Fecha | 29 Ago 2026, 11:00–16:00 CST | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
+| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date | Aug 29, 2026, 11:00–16:00 CST | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
 
 ---
 
-## Crónica Técnica: Hardware UAA 2024 vs huronOS 2022 (Kernel 6.0)
+## Technical Chronicle: UAA 2024 Hardware vs huronOS 2022 (Kernel 6.0)
 
-### El Contexto y Desafío
-huronOS alpha 0.4 es una distribución en vivo basada en Debian 11 (Bullseye) con Linux Kernel **6.0.15**, empaquetada originalmente entre 2022 y 2023. Actualmente es un proyecto que **no cuenta con mantenedores activos ni desarrollo upstream continuo**.
+### Background & Challenge
+huronOS alpha 0.4 is a live Debian 11 (Bullseye) distribution powered by Linux Kernel **6.0.15**, originally built between 2022 and 2023. Currently, the project **has no active upstream maintainers**.
 
-Para el ciclo de competencias 2024–2026, los laboratorios de cómputo de la **Universidad Autónoma de Aguascalientes (UAA)** fueron renovados con computadoras Dell de última generación (procesadores **Intel Core 14th Gen / Arrow Lake** con gráficos integrados `8086:7d67` y/o tarjetas gráficas dedicadas **NVIDIA GeForce RTX serie Ada Lovelace**).
+For the 2024–2026 contest cycles, the computer laboratories at **Universidad Autónoma de Aguascalientes (UAA)** were upgraded with modern Dell desktop workstations equipped with **14th Gen Intel Core / Arrow Lake** processors (`8086:7d67` integrated graphics) and/or dedicated **NVIDIA GeForce RTX (Ada Lovelace)** GPUs.
 
-### El Problema Técnico Encontrado
-1. **Falta de Drivers KMS:** El kernel 6.0.15 de huronOS carece de controladores *Kernel Mode Setting* (KMS) para hardware 2024 (el soporte para Intel Arrow Lake y GPUs NVIDIA modernas requiere kernels Linux >= 6.8 o el driver `xe`).
-2. **Pantalla Negra en Arranque Estándar:** Al arrancar huronOS de forma predeterminada, el sistema intentaba inicializar controladores KMS inexistentes o incompatibles, resultando en congelamiento con pantalla negra tras el menú de arranque.
-3. **Fallo de Xorg con `nomodeset`:** Al intentar la solución típica de arrancar con `nomodeset`, el servidor Xorg de huronOS (configurado con el driver estándar `modesetting`) colapsaba al no encontrar ningún dispositivo DRM/KMS funcional, impidiendo que el entorno gráfico Budgie Desktop iniciara.
+### Technical Issues Encountered
+1. **Missing KMS Drivers:** Linux kernel 6.0.15 lacks Kernel Mode Setting (KMS) drivers for 2024 hardware (Intel Arrow Lake and modern NVIDIA GPUs require Linux >= 6.8 or the newer `xe` driver).
+2. **Black Screen on Default Boot:** When booting huronOS with standard parameters, the system attempted to load nonexistent or incompatible KMS drivers, resulting in a system freeze and black screen immediately after the bootloader menu.
+3. **Xorg Failure with `nomodeset`:** Attempting the conventional `nomodeset` workaround caused huronOS's Xorg server (configured with standard `modesetting`) to crash due to missing DRM devices, preventing the Budgie Desktop from launching.
 
-### La Solución de Ingeniería Implementada
-Para garantizar que huronOS funcione de manera 100% confiable y sin modificar el kernel base, se diseñó una solución en capas:
+### Layered Engineering Solution
+To ensure huronOS runs reliably without rebuilding the base kernel, a layered fallback architecture was implemented:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                   Escritorio Budgie / Codium / Apps                      │
+│                   Budgie Desktop / Codium / Apps                         │
 └──────────────────────────────────────────────────────────────────────────┘
                                      │
                  ┌───────────────────┴───────────────────┐
@@ -70,31 +73,31 @@ Para garantizar que huronOS funcione de manera 100% confiable y sin modificar el
                  └───────────────────┬───────────────────┘
                                      │
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ Parámetros Kernel: modprobe.blacklist=i915,nouveau fbcon=nodefer        │
+│ Kernel Parameters: modprobe.blacklist=i915,nouveau fbcon=nodefer         │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Driver `xserver-xorg-video-fbdev` en `05-custom.hsl`:**
-   - Se extrajo el driver oficial de Debian `xserver-xorg-video-fbdev` y se inyectó en la capa personalizada `/usr/lib/xorg/modules/drivers/fbdev_drv.so`.
-   - Se configuró `/etc/X11/xorg.conf.d/99-display.conf` para dirigir el servidor Xorg directamente al framebuffer del firmware UEFI (`/dev/fb0`).
-2. **Aceleración por Software con Mesa LLVMpipe:**
-   - Dado que el framebuffer EFI no provee aceleración 3D por hardware, se configuraron `/etc/X11/Xsession.d/99-huronos-software-rendering` con `LIBGL_ALWAYS_SOFTWARE=1` y `GALLIUM_DRIVER=llvmpipe`.
-   - Esto permite que el entorno Budgie, Chromium y VS Code se rendericen a través de la CPU a 60 FPS estables.
-3. **Ajuste de Parámetros del Kernel en Bootloader:**
-   - Se descartó `nomodeset` para el modo gráfico (ya que bloquea la asignación del framebuffer) y se implementó `modprobe.blacklist=i915,nouveau fbcon=nodefer`.
-   - Se removió el parámetro obsoleto `vga=normal`.
-4. **Corrección de Menú Syslinux EFI de 64 bits:**
-   - Se sustituyeron las dependencias de menú de 32 bits por el módulo nativo `/EFI/Boot/menu.c32` de 64 bits en `/EFI/Boot/syslinux.cfg`, eliminando bloqueos de memoria en firmwares UEFI modernos.
+1. **`xserver-xorg-video-fbdev` Driver in `05-custom.hsl`:**
+   - Extracted official Debian `xserver-xorg-video-fbdev` driver and injected it into `/usr/lib/xorg/modules/drivers/fbdev_drv.so`.
+   - Configured `/etc/X11/xorg.conf.d/99-display.conf` to target the UEFI firmware framebuffer (`/dev/fb0`).
+2. **Software Rendering with Mesa LLVMpipe:**
+   - Because the EFI framebuffer provides no 3D hardware acceleration, `/etc/X11/Xsession.d/99-huronos-software-rendering` exports `LIBGL_ALWAYS_SOFTWARE=1` and `GALLIUM_DRIVER=llvmpipe`.
+   - This allows Budgie Desktop, Chromium, and VS Code to render smoothly via CPU at a steady 60 FPS.
+3. **Kernel Bootloader Parameters:**
+   - Replaced `nomodeset` with `modprobe.blacklist=i915,nouveau fbcon=nodefer` to preserve access to `/dev/fb0`.
+   - Removed the obsolete `vga=normal` parameter.
+4. **Native 64-bit Syslinux EFI Menu:**
+   - Replaced 32-bit menu dependencies with native 64-bit `/EFI/Boot/menu.c32` in `/EFI/Boot/syslinux.cfg`, preventing memory allocation faults on modern UEFI firmware.
 
 ---
 
-## Requisitos Previos
+## Prerequisites
 
-- Sistema Operativo: GNU/Linux (Fedora, Debian, Ubuntu, Arch Linux).
-- Memoria USB de **16 GiB o superior** (será formateada por completo).
-- La imagen ISO `huronOS-alpha-0.4-amd64.iso` en la raíz de este repositorio.
+- Operating System: GNU/Linux (Fedora, Debian, Ubuntu, Arch Linux).
+- USB Flash Drive of **16 GiB or larger** (will be completely formatted).
+- The base ISO image `huronOS-alpha-0.4-amd64.iso` placed in this repository directory.
 
-### Verificación de Checksums de la ISO
+### ISO Checksum Verification
 
 ```bash
 # MD5:    9ad2afe4980965c8b6b92fa00b8813d5
@@ -103,7 +106,7 @@ md5sum huronOS-alpha-0.4-amd64.iso
 sha256sum huronOS-alpha-0.4-amd64.iso
 ```
 
-### Instalación de Dependencias
+### Dependency Installation
 
 ```bash
 # Debian / Ubuntu:
@@ -118,138 +121,177 @@ sudo pacman -S squashfs-tools parted psmisc e2fsprogs dosfstools perl
 
 ---
 
-## Guía de Instalación Paso a Paso
+## Step-by-Step Installation Guide
 
-### Opción A: Instalación Automatizada Completa en USB
+### Option A: Fully Automated USB Installation
 
-El script `01-install-huronos.sh` ejecuta la instalación base y encadena automáticamente los pasos 2 y 3 (inyección de extensiones, wallpaper y fixes de GPU):
+The `01-install-huronos.sh` script executes the base ISO installer and automatically chains Steps 2 and 3 (offline extensions, wallpaper, SPICE vdagent, and GPU compatibility fixes):
 
 ```bash
 bash 01-install-huronos.sh
 ```
 
-El script solicitará:
-1. **Contraseña de root:** *(Elige una o presiona Enter para usar `toor`)*
-2. **URL de Directivas:** URL raw de GitHub del archivo `.hdf` correspondiente.
-3. **IP del Servidor:** *(Dejar en blanco para DHCP)*
-4. **Disco de destino:** Seleccionar la memoria USB correcta (ej. `/dev/sdb`).
+Prompts:
+1. **Root Password:** *(Choose one or press Enter to default to `toor`)*
+2. **Directives URL:** GitHub Raw URL of the corresponding `.hdf` file.
+3. **Server IP:** *(Leave blank for DHCP)*
+4. **Target Disk:** Select the correct USB block device (e.g. `/dev/sdb`).
 
 ---
 
-### Opción B: Ejecución Manual o Personalización Modular
+### Option B: Manual Execution & Modular Customization
 
-Si deseas aplicar cambios paso a paso en una memoria USB existente o partición montada:
+To apply individual steps on an existing USB drive or mounted filesystem:
 
-#### Paso 1: Instalación Base
+#### Step 1: Base USB Installation
 ```bash
 bash 01-install-huronos.sh
 ```
 
-#### Paso 2: Inyección de Capa Personalizada (Wallpaper + Driver fbdev + VS Code Extensions)
+#### Step 2: Inject Custom Layer (Wallpaper + fbdev Driver + SPICE vdagent + VS Code Extensions)
 ```bash
-# Auto-detecta partición con etiqueta HURONOS:
+# Auto-detects partition labeled HURONOS:
 sudo bash 02-inject-custom-layer.sh
 
-# O especificando partición y wallpaper:
+# Or specify partition and custom wallpaper:
 sudo bash 02-inject-custom-layer.sh /dev/sdX1 huronos-wallpaper.png
 ```
 
-#### Paso 2b: Inyección Específica de Extensiones de VS Code
+#### Step 2b: Standalone VS Code Extensions Injection
 ```bash
 sudo bash 02b-inject-vscode-extensions.sh /dev/sdX1
 ```
 
-#### Paso 3: Configuración de Bootloader (Fixes UAA 2024 / NVIDIA)
+#### Step 3: Bootloader Configuration (UAA 2024 / NVIDIA Fixes)
 ```bash
 sudo bash 03-configure-nvidia-boot.sh /dev/sdX1
 ```
 
-#### Paso 4: Actualización de Hash de Wallpaper en Directivas `.hdf`
+#### Step 4: Update Wallpaper SHA-256 Hash in `.hdf` Directives
 ```bash
 ./04-update-directives-wallpaper.sh huronos-wallpaper.png icpc-gpm-2026-3rd-date.hdf
 ```
 
-#### Paso 5: Pruebas en Máquina Virtual Local (KVM / virt-manager)
-- Probar con imagen de disco virtual:
+#### Step 5: Local Virtual Machine Testing
+
+> [!TIP]
+> **Which VM environment should you use?**
+> * **KVM / QEMU (`05-test-huronos-vm.sh`) — [RECOMMENDED / DEFAULT]:** Primary test environment. Emulates a physical USB bus (`bus=usb`), utilizes Linux native hardware virtualization (`/dev/kvm`), and includes `spice-vdagent` (adaptive dynamic screen resizing and shared clipboard).
+> * **VirtualBox (`07-test-huronos-vbox.sh`) — [OPTIONAL / ALTERNATIVE]:** Secondary runner for users who prefer Oracle VirtualBox. Requires the base disk image to be generated first by Step 5A.
+
+> [!NOTE]
+> **Secondary Disk / Custom Storage Path (`VM_DISK_DIR`):**
+> If your primary root/home partition has limited disk space and you prefer storing VM disk images (`.img` and `.vdi`) on a secondary drive or folder:
+> ```bash
+> export VM_DISK_DIR="/path/to/secondary/disk"
+> bash 05-test-huronos-vm.sh [directives.hdf]
+> bash 07-test-huronos-vbox.sh
+> ```
+
+##### Option A (Default / Recommended): KVM / virt-manager
+- **Create virtual disk image and boot in KVM:**
   ```bash
-  bash 05-test-huronos-vm.sh
+  bash 05-test-huronos-vm.sh [directives.hdf]
   ```
-- Probar directamente desde la USB física (ej. `/dev/sdb`):
+- **Boot directly from a connected physical USB drive (e.g. `/dev/sdb`):**
   ```bash
   bash 06-test-huronos-usb-vm.sh /dev/sdb
   ```
+- **Graphical Console & Full Screen in KVM (`virt-viewer`):**
+  - Connect to graphical console:
+    ```bash
+    virt-viewer -c qemu:///system huronOS-Test-VM &
+    # Or launch directly in full screen:
+    virt-viewer -c qemu:///system --full-screen huronOS-Test-VM &
+    ```
+  - `F11`: Toggle Full Screen mode.
+  - `Shift + F12`: Release captured mouse cursor.
+
+##### Option B (Optional / Alternative): Oracle VirtualBox
+- **Convert to VDI and boot in VirtualBox:**
+  ```bash
+  bash 07-test-huronos-vbox.sh
+  ```
+  *(The script converts `huronos-vm-disk.img` into `huronos-vm-disk.vdi` and launches the VM with SATA AHCI and VMSVGA graphics controllers).*
+- **VirtualBox Shortcuts:**
+  - `Right Ctrl + F`: Toggle Full Screen mode.
+  - `Right Ctrl + L`: Toggle Seamless mode.
+- **Stop the VM:**
+  ```bash
+  VBoxManage controlvm "huronOS-VirtualBox-VM" acpipowerbutton
+  ```
 
 ---
 
-## Extensiones de Visual Studio Code (C/C++, CPH, Python & Java vía VSIX Offline)
+## Visual Studio Code Offline Extensions (C/C++, CPH, Python & Java)
 
-Debido a que huronOS opera en entornos de concurso aislados y con **VSCodium 1.81.1**, las descargas directas desde la tienda gráfica online fallan con errores de descarga o incompatibilidad de API. Por ello, todas las extensiones requeridas se empaquetan y suministran **100% offline mediante paquetes `.vsix` compatibles**:
+Because huronOS operates in isolated contest environments with strict firewalls and **VSCodium 1.81.1**, downloading extensions directly from the online marketplace fails. Therefore, all required extensions are packaged and supplied **100% offline as verified `.vsix` packages**:
 
-| Extensión | Identificador / Módulo | Paquete VSIX | Funcionalidad |
+| Extension | Identifier / Module ID | VSIX Package | Capabilities |
 | --- | --- | --- | --- |
-| **C/C++ Tools** (`ms-vscode.cpptools`) | `programming/vsc-cpptools` | *Nativo en ISO* (v1.16.3) | Autocompletado IntelliSense, navegación de código, resaltado de sintaxis y formateo con `clang-format`. |
-| **Competitive Programming Helper** (`divyanshuagrawal.competitive-programming-helper`) | `programming/vsc-cph` | `competitive-programming-helper-2077.0.0.vsix` | Gestión de casos de prueba, ejecución rápida de soluciones, vista de diferencias (diff) y soporte multilingüe (C++, Java, Python, Kotlin). |
-| **Microsoft Python** (`ms-python.python`) | `programming/vsc-python` | `ms-python.python-2023.14.0.vsix` | Soporte de autocompletado con `jedi-language-server` offline y ejecución de Python 3 para desarrollo competitivo. |
-| **Language Support for Java™ by Red Hat** (`redhat.java`) | `programming/vsc-java` | `redhat.java-1.40.0.vsix` | Soporte completo de lenguaje Java (OpenJDK 17), servidor JDT Language Server offline, navegación y resolución de tipos. |
+| **C/C++ Tools** (`ms-vscode.cpptools`) | `programming/vsc-cpptools` | *Bundled in ISO* (v1.16.3) | IntelliSense autocompletion, code navigation, syntax highlighting, and formatting with `clang-format`. |
+| **Competitive Programming Helper** (`divyanshuagrawal.competitive-programming-helper`) | `programming/vsc-cph` | `competitive-programming-helper-2077.0.0.vsix` | Test case management, instant solution execution, visual diff viewer, multi-language support (C++, Java, Python, Kotlin). |
+| **Microsoft Python** (`ms-python.python`) | `programming/vsc-python` | `ms-python.python-2023.14.0.vsix` | Offline `jedi-language-server` autocompletion, linting, and Python 3 runtime integration for competitive programming. |
+| **Language Support for Java™ by Red Hat** (`redhat.java`) | `programming/vsc-java` | `redhat.java-1.40.0.vsix` | Full Java language support (OpenJDK 17), offline JDT Language Server, diagnostics, and type resolution. |
 
-### Integración y Métodos de Instalación Offline
+### Integration & Offline Installation Architecture
 
-1. **Pre-instaladas en el Sistema (`05-custom.hsl`):** Todas las extensiones se encuentran pre-extraídas y activas en `/opt/codium/contestant/extensions/` junto con sus manifiestos `ids/vsc-*.json` y `extensions.json` precompilado. Los directorios tienen permisos `777`: es necesario porque el wrapper de Codium reconstruye `extensions.json` al iniciar como el usuario `contestant`.
-2. **Paquetes VSIX de Respaldo:** Copias originales de los archivos `.vsix` están disponibles en `/opt/codium/vsix/` y `/home/contestant/vsix/`.
-3. **Instalación Manual Gráfica:** Desde Codium: `Extensions` -> Menú de tres puntos `...` -> **Install from VSIX...** seleccionando cualquier archivo de `/home/contestant/vsix/`.
-4. **Comando de Restauración Rápida:** En terminal basta con ejecutar:
+1. **Pre-installed in System Layer (`05-custom.hsl`):** All extensions are pre-extracted and active in `/opt/codium/contestant/extensions/` with manifests `ids/vsc-*.json` and precompiled `extensions.json`. Permissions are set to `777` because the Codium wrapper rebuilds `extensions.json` at startup as user `contestant`.
+2. **Backup VSIX Storage:** Offline copies of all `.vsix` archives are stored in `/opt/codium/vsix/` and `/home/contestant/vsix/`.
+3. **Manual GUI Installation:** In Codium: *Extensions* -> Three-dot menu `...` -> **Install from VSIX...** selecting any file from `/home/contestant/vsix/`.
+4. **CLI Restoration Helper:** In a terminal, contestants or admins can run:
    ```bash
    install-vsix-extensions
    ```
-5. **Registro en huronOS:** Declaradas en las directivas (`AvailableSoftware`), en `/etc/hmm/any` y en `/etc/hsync/all_software` para interoperabilidad con el gestor `hmm`. Los módulos `.hsm` generados conservan esos permisos; esto es importante porque `hsync` los monta por encima de `05-custom.hsl`.
+5. **huronOS Module Registration:** Declared in directives (`AvailableSoftware`), `/etc/hmm/any`, and `/etc/hsync/all_software` for interoperability with the `hmm` manager.
 
 ---
 
-## Instrucciones de Arranque en Máquinas de Concurso
+## Contest Machine Boot Instructions
 
-1. Conecta la memoria USB en la computadora del laboratorio.
-2. Si el equipo cuenta **únicamente con tarjeta NVIDIA dedicada**, conecta el monitor al puerto de la tarjeta gráfica (no a la tarjeta madre).
-3. Enciende el equipo y presiona la tecla del menú de arranque (**F12** en Dell, **F11** en HP, **F8/Del** en Asus).
-4. **Desactiva Secure Boot** en la configuración UEFI si está habilitado.
-5. Selecciona la memoria USB para iniciar.
-6. huronOS arrancará automáticamente en el escritorio del competidor tras 7 segundos.
+1. Plug the USB flash drive into the contest computer.
+2. If the machine features **only a dedicated NVIDIA GPU**, connect the display monitor cable directly to the GPU port (not the motherboard video port).
+3. Power on the computer and press the boot menu key (**F12** on Dell, **F11** on HP, **F8/Del** on Asus).
+4. **Disable Secure Boot** in UEFI settings if active.
+5. Select the USB flash drive to boot.
+6. huronOS will automatically boot into the contestant desktop after 7 seconds.
 
 ---
 
-## Redes y Conectividad: Wi-Fi Empresarial (WPA-Enterprise / IEEE 802.1X)
+## Networking: Enterprise Wi-Fi (WPA-Enterprise / IEEE 802.1X)
 
-### Diagnóstico del Error en Redes Institucionales (`RIUAA` / `eduroam`)
+### Institutional Wi-Fi Issue (`RIUAA` / `eduroam`)
 
-Al intentar conectarse desde la interfaz gráfica de huronOS (applet de red en la bandeja del sistema) a redes inalámbricas con seguridad **WPA-Enterprise / 802.1X** (como la red institucional **`RIUAA`** de la UAA o **`eduroam`**), el sistema muestra el siguiente error:
+When attempting to connect to enterprise wireless networks (such as UAA's **`RIUAA`** or **`eduroam`**) via huronOS's system tray network applet, the system returns:
 
 > **"Failed to toggle connection state. IEEE8021x secured services have to be manually configured."**
 
-### ¿Por qué ocurre?
-huronOS utiliza **ConnMan** como demonio y gestor de conexiones de red. A diferencia de NetworkManager, el applet gráfico ligero de ConnMan no cuenta con un asistente interactivo para solicitar métodos de autenticación EAP avanzados (como PEAP, TTLS, MSCHAPv2 o certificados de usuario) directamente al hacer clic sobre el SSID en la lista.
+### Why does this happen?
+huronOS uses **ConnMan** (`cmst`) as its network daemon. Unlike NetworkManager, ConnMan's lightweight tray GUI lacks an interactive credential prompt for EAP authentication (PEAP, MSCHAPv2, TTLS) when clicking on an 802.1X SSID.
 
-### Opciones y Soluciones
+### Solutions & Recommendations
 
-#### 1. Opción Recomendada para el Concurso: Conexión Cableada (Ethernet)
-En los laboratorios de cómputo de la sede UAA, todas las estaciones de trabajo deben conectarse mediante **cable de red Ethernet (LAN)**.
-- huronOS detecta y configura automáticamente la interfaz cableada mediante DHCP.
-- Es la opción oficial, más rápida, estable y libre de problemas de autenticación o interferencias de radiofrecuencia.
+#### 1. Official Contest Recommendation: Wired Ethernet (LAN)
+In the UAA contest laboratories, all workstations must connect via **Ethernet network cable**.
+- huronOS automatically configures wired interfaces via DHCP.
+- Eliminates wireless interference, disconnections, and authentication issues.
 
-#### 2. Alternativa Inalámbrica Rápida: Zona Wi-Fi Portátil (Hotspot WPA-PSK)
-Si se requiere conexión inalámbrica durante etapas de pruebas o preparación:
-- Compartir datos desde un teléfono móvil o router portátil con seguridad estándar **WPA2-Personal (WPA-PSK)**.
-- Este tipo de red sí solicita la contraseña directamente en el diálogo gráfico simple de huronOS.
+#### 2. Fast Wireless Alternative: Mobile Hotspot (WPA-PSK)
+For testing or preparation:
+- Share mobile data or a portable router using standard **WPA2-Personal (WPA-PSK)**.
+- ConnMan prompts for the pre-shared password directly in the graphical interface.
 
-#### 3. Configuración Manual de ConnMan para WPA-Enterprise (`RIUAA` / `eduroam`)
-Si es estrictamente necesario conectarse a `RIUAA` o `eduroam` por Wi-Fi, se debe crear un archivo de aprovisionamiento de servicio en `/var/lib/connman/`:
+#### 3. Manual ConnMan Configuration for WPA-Enterprise (`RIUAA` / `eduroam`)
+If Wi-Fi connection to `RIUAA` or `eduroam` is strictly necessary, create a service provisioning file under `/var/lib/connman/`:
 
-1. Abrir una terminal (`Konsole` o `Ctrl+Alt+T`) y crear el archivo con permisos de superusuario:
+1. Open a terminal (`Konsole` or `Ctrl+Alt+T`) and create the configuration file with root privileges:
    ```bash
    sudo nano /var/lib/connman/riuaa.config
    ```
 
-2. Agregar la configuración correspondiente según la red:
+2. Add the corresponding configuration:
 
-   **Para red `RIUAA` (UAA):**
+   **For `RIUAA` (UAA Campus Network):**
    ```ini
    [global]
    Description = Red Universitaria RIUAA
@@ -259,11 +301,11 @@ Si es estrictamente necesario conectarse a `RIUAA` o `eduroam` por Wi-Fi, se deb
    Name = RIUAA
    EAP = peap
    Phase2 = MSCHAPV2
-   Identity = TU_ID_O_CORREO_INSTITUCIONAL
-   Passphrase = TU_CONTRASENA_INSTITUCIONAL
+   Identity = YOUR_INSTITUTIONAL_ID_OR_EMAIL
+   Passphrase = YOUR_INSTITUTIONAL_PASSWORD
    ```
 
-   **Para red `eduroam`:**
+   **For `eduroam`:**
    ```ini
    [global]
    Description = Red Academica eduroam
@@ -273,17 +315,16 @@ Si es estrictamente necesario conectarse a `RIUAA` o `eduroam` por Wi-Fi, se deb
    Name = eduroam
    EAP = peap
    Phase2 = MSCHAPV2
-   Identity = usuario@institucion.edu.mx
-   Passphrase = TU_CONTRASENA
+   Identity = user@institution.edu
+   Passphrase = YOUR_PASSWORD
    ```
 
-3. Guardar el archivo (`Ctrl+O`, `Enter`) y salir (`Ctrl+X`).
-4. Reiniciar el servicio de ConnMan para aplicar los cambios:
+3. Save the file (`Ctrl+O`, `Enter`) and exit (`Ctrl+X`).
+4. Restart the ConnMan service to apply changes:
    ```bash
    sudo systemctl restart connman
    ```
-   ConnMan reconocerá el servicio aprovisionado y se conectará automáticamente a la red institucional.
-5. Verificar el estado de la conexión:
+5. Verify network connectivity:
    ```bash
    connmanctl services
    ping -c 3 moj.naquadah.com.br
@@ -291,11 +332,11 @@ Si es estrictamente necesario conectarse a `RIUAA` o `eduroam` por Wi-Fi, se deb
 
 ---
 
-## Pruebas de Desarrollo y Calidad (ShellCheck)
+## Quality Assurance & ShellCheck Verification
 
-De acuerdo con las directrices de calidad del repositorio, todos los scripts deben verificarse con `shellcheck`:
+In accordance with repository guidelines, all shell scripts are verified with `shellcheck`:
 
 ```bash
-shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh
+shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh 07-test-huronos-vbox.sh
 ```
-*Garantía de calidad: 0 errores y 0 advertencias.*
+*Quality guarantee: 0 errors and 0 warnings.*

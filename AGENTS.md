@@ -191,6 +191,14 @@ Key settings:
  - **Physical USB passthrough script:** `06-test-huronos-usb-vm.sh` (e.g. `bash 06-test-huronos-usb-vm.sh /dev/sdb`).
  - **Boot mode:** SeaBIOS (BIOS/MBR legacy boot) — DO NOT use OVMF/UEFI as huronOS uses extlinux.
  - **Physical USB passthrough:** A physical USB created with `01-install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager` or directly via `06-test-huronos-usb-vm.sh`.
+ - **Graphical Console & Full Screen:**
+   - Command: `virt-viewer -c qemu:///system --full-screen huronOS-Test-VM &`
+   - Toggle Full Screen: `F11` (release cursor: `Shift + F12`).
+   - Resolution setting inside huronOS: *Settings -> Displays -> 1920x1080* or `xrandr -s 1920x1080`.
+ - **VirtualBox Testing Script:** `07-test-huronos-vbox.sh`
+   - Converts `huronos-vm-disk.img` to `.vdi` using `qemu-img convert -U -f raw -O vdi` and launches `huronOS-VirtualBox-VM` using native `vboxguest`, `vboxvideo`, and `vboxsf` kernel modules.
+ - **Custom Disk Storage (`VM_DISK_DIR` / `VM_DISK_PATH`):**
+   - Both `05-test-huronos-vm.sh` and `07-test-huronos-vbox.sh` support `export VM_DISK_DIR="/path/to/secondary/disk"` to store `.img` and `.vdi` files on alternative drives/partitions.
 
 ---
 

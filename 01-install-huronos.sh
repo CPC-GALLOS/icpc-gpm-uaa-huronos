@@ -18,11 +18,11 @@ WALLPAPER_FILE="$SCRIPT_DIR/wallpaper.png"
 
 # Locate ISO
 if [ ! -f "$ISO_PATH" ]; then
-    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "/home/ravary/Desktop/website" "/home/ravary/d/VM" "$HOME/Downloads" -maxdepth 2 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
+    ISO_CANDIDATE=$(find "$SCRIPT_DIR" "$HOME/Downloads" "$HOME/VM" -maxdepth 2 -name "huronOS*.iso" 2>/dev/null | head -n 1 || true)
     if [ -n "$ISO_CANDIDATE" ] && [ -f "$ISO_CANDIDATE" ]; then
         ISO_PATH="$ISO_CANDIDATE"
     else
-        echo "❌ Error: huronOS ISO not found in $SCRIPT_DIR, ~/Desktop/website/, or ~/d/VM/"
+        echo "❌ Error: huronOS ISO not found in $SCRIPT_DIR, $HOME/Downloads/, or $HOME/VM/"
         exit 1
     fi
 fi
@@ -162,7 +162,7 @@ echo ""
 
 # --- Step 6: Inject custom wallpaper, graphics fallback, and VS Code extensions ---
 echo "[Step 6/9] Injecting custom wallpaper, graphics fallback, and VS Code extensions..."
-sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "" "$WALLPAPER_FILE" || {
+sudo bash "$SCRIPT_DIR/02-inject-custom-layer.sh" "" "$WALLPAPER_FILE" "$HDF_FILE" || {
     echo "⚠️ Warning: Custom layer injection encountered an issue, continuing..."
 }
 echo ""

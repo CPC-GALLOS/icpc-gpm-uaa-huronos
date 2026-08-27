@@ -102,31 +102,16 @@ fi
 
 # Configure boot/huronos.cfg for Legacy BIOS
 cat << EOF > "$CFG_BOOT"
-UI vesamenu.c32
+DEFAULT persistent-fbdev
+TIMEOUT 30
 PROMPT 0
-TIMEOUT 70
 
-MENU HSHIFT 15
-MENU WIDTH 49
-MENU title Boot huronOS (Legacy Mode)
-
-MENU background /boot/huronboot.png
-MENU color title	* #FFFFFFFF *
-MENU color border	* #00000000 #00000000 none
-MENU color sel		* #ffffffff #76a1d0ff *
-MENU color hotsel	1;7;37;40 #ffffffff #76a1d0ff *
-MENU color tabmsg	* #ffffffff #00000000 *
-MENU color help		37;40 #ffdddd00 #00000000 none
-MENU vshift 16
-MENU rows 7
-MENU helpmsgrow 12
-MENU cmdlinerow 12
-MENU tabmsgrow 13
+MENU TITLE huronOS (Legacy BIOS Boot)
+MENU COLOR title * #FFFFFFFF *
+MENU COLOR sel * #ffffffff #76a1d0ff *
+MENU COLOR tabmsg * #ffffffff #00000000 *
 MENU tabmsg Press [Tab] to edit options, [Enter] to boot
 
-MENU AUTOBOOT [Esc] -> options, Booting in # second{,s}
-
-DEFAULT persistent-fbdev
 LABEL persistent-fbdev
   MENU LABEL ^1. Start contest system (EFI framebuffer / fbdev - Default)
   KERNEL /boot/vmlinuz-6.0.15-huronos+

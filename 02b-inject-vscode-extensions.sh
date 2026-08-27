@@ -236,7 +236,8 @@ EOF
         echo "  Building standalone module: $HSM_FILE"
         TMP_HSM="$TMP_LAB/${MOD_ID}.hsm"
         rm -f "$TMP_HSM"
-        mksquashfs "$EXT_ROOT" "$TMP_HSM" -comp xz -b 1024K -always-use-fragments -noappend >/dev/null
+        NPROCS=$(nproc 2>/dev/null || echo 4)
+        mksquashfs "$EXT_ROOT" "$TMP_HSM" -comp xz -b 256K -processors "$NPROCS" -always-use-fragments -noappend >/dev/null
         cp -f "$TMP_HSM" "$HSM_FILE"
         GENERATED_HSMS+=("${MOD_ID}.hsm")
     fi
@@ -400,7 +401,8 @@ chmod -R 777 "$LAYER_ROOT/home/contestant/vsix" 2>/dev/null || true
 echo "----------------------------------------------------"
 echo "Rebuilding 05-custom.hsl squashfs layer..."
 rm -f "$TMP_LAB/05-custom.hsl"
-mksquashfs "$LAYER_ROOT" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -always-use-fragments -noappend >/dev/null
+NPROCS=$(nproc 2>/dev/null || echo 4)
+mksquashfs "$LAYER_ROOT" "$TMP_LAB/05-custom.hsl" -comp xz -b 1024K -processors "$NPROCS" -always-use-fragments -noappend >/dev/null
 cp -f "$TMP_LAB/05-custom.hsl" "$CUSTOM_HSL"
 echo "✓ Updated $CUSTOM_HSL with full extension suite."
 
