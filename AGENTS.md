@@ -172,7 +172,7 @@ Edit on the USB: `HURONOS/data/configs/sync-server.conf`
 
 Key settings:
 
-- Contest window: `2026-08-29T11:00:00` → `2026-08-29T16:00:00`
+- Contest window: `2026-08-29T10:45:00` → `2026-08-29T16:15:00` (includes 15-min buffer for mode transitions)
 - Config expires: `2026-08-30T23:59:59`
 - Default keyboard: `latam`
 - Contest firewall: `all` (sin firewall / sin drop para compatibilidad con MOJ)
@@ -188,15 +188,16 @@ Key settings:
  
  - **Automated setup script (Virtual Disk Image):** `05-test-huronos-vm.sh`
    - **Method:** Creates a 16 GiB raw disk image (`huronos-vm-disk.img`), attaches it as a loop device (`/dev/loopN`), runs `install.sh` from the ISO onto the loop device, and launches `virt-install`.
- - **Physical USB passthrough script:** `06-test-huronos-usb-vm.sh` (e.g. `bash 06-test-huronos-usb-vm.sh /dev/sdb`).
+ - **Physical USB passthrough script (KVM):** `06-test-huronos-usb-vm.sh` (e.g. `bash 06-test-huronos-usb-vm.sh /dev/sdb`).
  - **Boot mode:** SeaBIOS (BIOS/MBR legacy boot) — DO NOT use OVMF/UEFI as huronOS uses extlinux.
- - **Physical USB passthrough:** A physical USB created with `01-install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager` or directly via `06-test-huronos-usb-vm.sh`.
- - **Graphical Console & Full Screen:**
+ - **Physical USB passthrough:** A physical USB created with `01-install-huronos.sh` can also be passed through as a USB Host Device in `virt-manager` or directly via `06-test-huronos-usb-vm.sh` / `08-test-huronos-usb-vbox.sh`.
+ - **Graphical Console & Full Screen (KVM):**
    - Command: `virt-viewer -c qemu:///system --full-screen huronOS-Test-VM &`
    - Toggle Full Screen: `F11` (release cursor: `Shift + F12`).
    - Resolution setting inside huronOS: *Settings -> Displays -> 1920x1080* or `xrandr -s 1920x1080`.
- - **VirtualBox Testing Script:** `07-test-huronos-vbox.sh`
-   - Converts `huronos-vm-disk.img` to `.vdi` using `qemu-img convert -U -f raw -O vdi` and launches `huronOS-VirtualBox-VM` using native `vboxguest`, `vboxvideo`, and `vboxsf` kernel modules.
+ - **VirtualBox Testing Scripts:**
+   - **Virtual Disk Image:** `07-test-huronos-vbox.sh` converts `huronos-vm-disk.img` to `.vdi` using `qemu-img convert -U -f raw -O vdi` and launches `huronOS-VirtualBox-VM` using native `vboxguest`, `vboxvideo`, and `vboxsf` kernel modules.
+   - **Physical USB Drive:** `08-test-huronos-usb-vbox.sh` (e.g. `bash 08-test-huronos-usb-vbox.sh /dev/sdb`) creates a raw disk VMDK descriptor directly mapped to the physical USB and boots `huronOS-USB-VirtualBox-VM`.
  - **Custom Disk Storage (`VM_DISK_DIR` / `VM_DISK_PATH`):**
    - Both `05-test-huronos-vm.sh` and `07-test-huronos-vbox.sh` support `export VM_DISK_DIR="/path/to/secondary/disk"` to store `.img` and `.vdi` files on alternative drives/partitions.
 
@@ -276,7 +277,7 @@ huronOS uses **ConnMan** (`cmst`) for networking.
 > **Mandatory verification:** Any modified or newly created shell script (`*.sh`) in this repository **must always be verified with `shellcheck`**:
 >
 > ```bash
-> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh
+> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh 07-test-huronos-vbox.sh 08-test-huronos-usb-vbox.sh
 > ```
 >
 > All scripts in this repo must pass `shellcheck` with zero errors and zero warnings before committing.

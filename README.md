@@ -19,9 +19,10 @@ icpc-gpm-uaa-huronos/
 ├── 02b-inject-vscode-extensions.sh     # [Helper] Standalone VS Code extension injector (CPH, C++, Python, Java)
 ├── 03-configure-nvidia-boot.sh         # [Step 3] Bootloader configuration for 2024 hardware and NVIDIA GPUs
 ├── 04-update-directives-wallpaper.sh   # [Utility] Computes wallpaper SHA256 hashes and updates .hdf files
-├── 05-test-huronos-vm.sh               # [VM - DEFAULT] Creates and runs local VM in KVM / virt-manager (with SPICE vdagent)
+├── 05-test-huronos-vm.sh               # [VM - KVM Disk] Creates and runs local VM in KVM / virt-manager (with SPICE vdagent)
 ├── 06-test-huronos-usb-vm.sh           # [VM - KVM USB] Direct physical USB boot in KVM / virt-viewer
-├── 07-test-huronos-vbox.sh             # [VM - OPTIONAL] Converts disk to VDI and boots inside Oracle VirtualBox
+├── 07-test-huronos-vbox.sh             # [VM - VBox Disk] Converts disk image to VDI and boots inside Oracle VirtualBox
+├── 08-test-huronos-usb-vbox.sh         # [VM - VBox USB] Direct physical USB boot inside Oracle VirtualBox via raw VMDK
 ├── competitive-programming-helper-*.vsix # Offline CPH extension package for VS Code
 ├── ms-python.python-*.vsix             # Offline Python extension package for VS Code
 ├── redhat.java-*.vsix                  # Offline Java language support package for VS Code
@@ -36,7 +37,7 @@ icpc-gpm-uaa-huronos/
 
 | File | Contest | Date & Schedule | Directives URL |
 | --- | --- | --- | --- |
-| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date | Aug 29, 2026, 11:00–16:00 CST | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
+| [`icpc-gpm-2026-3rd-date.hdf`](./icpc-gpm-2026-3rd-date.hdf) | Gran Premio de México 2026 – 3rd Date | Aug 29, 2026, 10:45–16:15 CST (includes 15-min buffer) | [GitHub Raw](https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf) |
 
 ---
 
@@ -79,7 +80,7 @@ To ensure huronOS runs reliably without rebuilding the base kernel, a layered fa
 
 1. **`xserver-xorg-video-fbdev` Driver in `05-custom.hsl`:**
    - Extracted official Debian `xserver-xorg-video-fbdev` driver and injected it into `/usr/lib/xorg/modules/drivers/fbdev_drv.so`.
-   - Configured `/etc/X11/xorg.conf.d/99-display.conf` to target the UEFI firmware framebuffer (`/dev/fb0`).
+   - Removed rigid `99-modesetting.conf` and `99-display.conf` overrides so Xorg cleanly uses `modesetting` when KMS is available (KVM/VirtualBox) and seamlessly falls back to `fbdev` on the UEFI firmware framebuffer (`/dev/fb0`) on real hardware.
 2. **Software Rendering with Mesa LLVMpipe:**
    - Because the EFI framebuffer provides no 3D hardware acceleration, `/etc/X11/Xsession.d/99-huronos-software-rendering` exports `LIBGL_ALWAYS_SOFTWARE=1` and `GALLIUM_DRIVER=llvmpipe`.
    - This allows Budgie Desktop, Chromium, and VS Code to render smoothly via CPU at a steady 60 FPS.
@@ -208,17 +209,23 @@ sudo bash 03-configure-nvidia-boot.sh /dev/sdX1
   - `Shift + F12`: Release captured mouse cursor.
 
 ##### Option B (Optional / Alternative): Oracle VirtualBox
-- **Convert to VDI and boot in VirtualBox:**
+- **Convert virtual disk image to VDI and boot in VirtualBox:**
   ```bash
   bash 07-test-huronos-vbox.sh
   ```
   *(The script converts `huronos-vm-disk.img` into `huronos-vm-disk.vdi` and launches the VM with SATA AHCI and VMSVGA graphics controllers).*
+- **Boot directly from a physical USB drive in VirtualBox (raw disk mapping):**
+  ```bash
+  bash 08-test-huronos-usb-vbox.sh /dev/sdb
+  ```
 - **VirtualBox Shortcuts:**
   - `Right Ctrl + F`: Toggle Full Screen mode.
   - `Right Ctrl + L`: Toggle Seamless mode.
 - **Stop the VM:**
   ```bash
   VBoxManage controlvm "huronOS-VirtualBox-VM" acpipowerbutton
+  # Or for the USB VM:
+  VBoxManage controlvm "huronOS-USB-VirtualBox-VM" acpipowerbutton
   ```
 
 ---

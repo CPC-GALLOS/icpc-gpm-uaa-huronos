@@ -20,8 +20,9 @@ if [ -n "$HDF_SRC" ] && [ ! -f "$HDF_SRC" ]; then
     HDF_SRC=""
 fi
 if [ -z "$HDF_SRC" ]; then
-    if [ -f "$SCRIPT_DIR/icpc-test-2026-08-26.hdf" ]; then
-        HDF_SRC="$SCRIPT_DIR/icpc-test-2026-08-26.hdf"
+    FOUND_TEST_HDF=$(find "$SCRIPT_DIR" -maxdepth 1 -name "icpc-test-*.hdf" 2>/dev/null | sort -r | head -n 1 || true)
+    if [ -n "$FOUND_TEST_HDF" ] && [ -f "$FOUND_TEST_HDF" ]; then
+        HDF_SRC="$FOUND_TEST_HDF"
     elif [ -f "$SCRIPT_DIR/icpc-gpm-2026-3rd-date.hdf" ]; then
         HDF_SRC="$SCRIPT_DIR/icpc-gpm-2026-3rd-date.hdf"
     fi
@@ -196,34 +197,48 @@ install -m 0755 "$TMP_LAB/fbdev-package/usr/lib/xorg/modules/drivers/fbdev_drv.s
 echo "Downloading Debian SPICE Guest Agent (spice-vdagent) for KVM/SPICE integration..."
 mkdir -p "$TMP_LAB/spice-package"
 if curl -fsSL --retry 2 -o "$TMP_LAB/spice-vdagent.deb" "$SPICE_VDAGENT_DEB_URL"; then
-    if echo "$SPICE_VDAGENT_DEB_SHA256  "$TMP_LAB/spice-vdagent.deb"" | sha256sum -c - >/dev/null 2>&1; then
+    if echo "$SPICE_VDAGENT_DEB_SHA256  $TMP_LAB/spice-vdagent.deb" | sha256sum -c - >/dev/null 2>&1; then
         (
             cd "$TMP_LAB/spice-package"
             ar x "$TMP_LAB/spice-vdagent.deb"
-            tar -xJf data.tar.xz -C "$TMP_LAB/squashfs-root/" ./usr/bin/spice-vdagent ./usr/sbin/spice-vdagentd ./lib/systemd/system/spice-vdagentd.service ./lib/systemd/system/spice-vdagentd.socket ./etc/xdg/autostart/spice-vdagent.desktop ./lib/udev/rules.d/70-spice-vdagentd.rules 2>/dev/null || true
+            tar -xJf data.tar.xz
         )
+        mkdir -p "$TMP_LAB/squashfs-root/usr/bin"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/sbin"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/lib/systemd/system"
+        mkdir -p "$TMP_LAB/squashfs-root/usr/lib/udev/rules.d"
+        mkdir -p "$TMP_LAB/squashfs-root/etc/xdg/autostart"
         mkdir -p "$TMP_LAB/squashfs-root/etc/systemd/system/sockets.target.wants"
-        ln -sf /lib/systemd/system/spice-vdagentd.socket "$TMP_LAB/squashfs-root/etc/systemd/system/sockets.target.wants/spice-vdagentd.socket" 2>/dev/null || true
+        mkdir -p "$TMP_LAB/squashfs-root/etc/systemd/system/multi-user.target.wants"
+
+        install -m 0755 "$TMP_LAB/spice-package/usr/bin/spice-vdagent" "$TMP_LAB/squashfs-root/usr/bin/spice-vdagent"
+        install -m 0755 "$TMP_LAB/spice-package/usr/sbin/spice-vdagentd" "$TMP_LAB/squashfs-root/usr/sbin/spice-vdagentd"
+        cp -f "$TMP_LAB/spice-package/lib/systemd/system/"* "$TMP_LAB/squashfs-root/usr/lib/systemd/system/" 2>/dev/null || true
+        cp -f "$TMP_LAB/spice-package/lib/udev/rules.d/"* "$TMP_LAB/squashfs-root/usr/lib/udev/rules.d/" 2>/dev/null || true
+        cp -f "$TMP_LAB/spice-package/etc/xdg/autostart/"* "$TMP_LAB/squashfs-root/etc/xdg/autostart/" 2>/dev/null || true
+
+        ln -sf /usr/lib/systemd/system/spice-vdagentd.socket "$TMP_LAB/squashfs-root/etc/systemd/system/sockets.target.wants/spice-vdagentd.socket" 2>/dev/null || true
+        ln -sf /usr/lib/systemd/system/spice-vdagentd.service "$TMP_LAB/squashfs-root/etc/systemd/system/multi-user.target.wants/spice-vdagentd.service" 2>/dev/null || true
         echo "✓ Injected SPICE vdagent (auto-resolution & clipboard sharing enabled)"
     fi
 fi
 
-cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-display.conf"
-# Linux 6.0 in huronOS alpha 0.4 has no KMS driver for Intel Arrow Lake.
-# Use the EFI framebuffer exposed as /dev/fb0, not the modesetting driver.
-Section "Device"
-    Identifier "EFI framebuffer"
-    Driver "fbdev"
-    Option "fbdev" "/dev/fb0"
-EndSection
+# Prevent AUFS merged-usr symlink masking: ensure no root-level lib/bin/sbin exists in 05-custom.hsl
+rm -rf "$TMP_LAB/squashfs-root/lib" "$TMP_LAB/squashfs-root/lib64" "$TMP_LAB/squashfs-root/bin" "$TMP_LAB/squashfs-root/sbin"
 
-Section "Screen"
-    Identifier "Default Screen"
-    Device "EFI framebuffer"
-EndSection
-EOF
+# Clean up any rigid Section Device overrides to let Xorg naturally probe modesetting (KMS/QXL) first, and fbdev fallback second
+rm -f "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-display.conf"
+rm -f "$TMP_LAB/squashfs-root/etc/X11/xorg.conf.d/99-modesetting.conf"
 
 mkdir -p "$TMP_LAB/squashfs-root/etc/X11/Xsession.d"
+
+cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/Xsession.d/98-spice-vdagent"
+# Auto-start SPICE user agent for dynamic Xrandr resolution and clipboard sharing in KVM
+if [ -x /usr/bin/spice-vdagent ]; then
+    /usr/bin/spice-vdagent >/dev/null 2>&1 &
+fi
+EOF
+
 cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/X11/Xsession.d/99-huronos-software-rendering"
 # Render OpenGL clients with Mesa LLVMpipe; efifb has no 3D acceleration.
 export LIBGL_ALWAYS_SOFTWARE=1

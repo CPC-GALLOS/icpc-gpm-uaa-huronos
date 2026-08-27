@@ -1,6 +1,6 @@
 [Global]
 TimeZone=America/Mexico_City
-ConfigExpirationTime=2026-08-27T23:59:59
+ConfigExpirationTime=2026-08-28T23:59:59
 AvailableKeyboardLayouts=latam|us|es|
 DefaultKeyboardLayout=latam
 EventConfig=false
@@ -34,4 +34,4 @@ WallpaperSha256=132c729e22141312472a1b6e965843333bec1be03255a7a600eb696ba6f85ff8
 [Event-Times]
 
 [Contest-Times]
-2026-08-26T19:00:00 2026-08-26T21:00:00
+2026-08-27T00:00:00 2026-08-27T23:59:59

@@ -97,8 +97,14 @@ echo ""
 echo "[Step 3/4] Configuring VirtualBox VM ($VM_NAME)..."
 
 if ! VBoxManage list vms | grep -q "\"$VM_NAME\""; then
-    echo "Creating new VirtualBox machine: $VM_NAME..."
-    VBoxManage createvm --name "$VM_NAME" --ostype "Debian_64" --register
+    VBOX_FILE="$HOME/VirtualBox VMs/$VM_NAME/$VM_NAME.vbox"
+    if [ -f "$VBOX_FILE" ]; then
+        echo "Registering existing VirtualBox machine: $VM_NAME..."
+        VBoxManage registervm "$VBOX_FILE" 2>/dev/null || VBoxManage createvm --name "$VM_NAME" --ostype "Debian_64" --register
+    else
+        echo "Creating new VirtualBox machine: $VM_NAME..."
+        VBoxManage createvm --name "$VM_NAME" --ostype "Debian_64" --register
+    fi
 fi
 
 # Configure VM properties

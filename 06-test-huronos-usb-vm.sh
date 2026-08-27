@@ -28,6 +28,7 @@ fi
 echo "============================================="
 echo " huronOS Physical USB KVM Test VM"
 echo "============================================="
+echo "Note: For VirtualBox USB testing, use: bash 08-test-huronos-usb-vbox.sh"
 echo ""
 
 # Check KVM availability
