@@ -17,6 +17,8 @@ TARGET_INPUT=""
 for arg in "$@"; do
     if [[ "$arg" =~ ^/dev/ ]]; then
         TARGET_INPUT="$arg"
+    elif [ -b "$arg" ]; then
+        TARGET_INPUT="$arg"
     fi
 done
 
@@ -66,21 +68,30 @@ lsblk "$TARGET_DEV" 2>/dev/null || true
 echo ""
 
 # Check for mounted partitions on host and unmount them
-MOUNTED_PARTS=$(findmnt -n -o TARGET -S "$TARGET_DEV" 2>/dev/null || true)
-if [ -n "$MOUNTED_PARTS" ]; then
-    echo "⚠️ Warning: Partitions on $TARGET_DEV are currently mounted on host:"
-    echo "$MOUNTED_PARTS"
-    echo "Unmounting for VM safety and raw disk access..."
-    for part in $(lsblk -nr -o NAME "$TARGET_DEV"); do
+for part in $(lsblk -nr -o NAME "$TARGET_DEV" 2>/dev/null || true); do
+    if findmnt -n "/dev/$part" &>/dev/null; then
+        echo "Unmounting /dev/$part for VM safety..."
         sudo umount "/dev/$part" 2>/dev/null || true
-    done
-fi
+    fi
+done
 
 # Ensure user permissions on raw block device
 if [ ! -r "$TARGET_DEV" ] || [ ! -w "$TARGET_DEV" ]; then
-    echo "Configuring read/write access permissions for $TARGET_DEV..."
-    sudo chmod 666 "$TARGET_DEV" "${TARGET_DEV}"* 2>/dev/null || true
+    echo "Configuring read/write access permissions for $TARGET_DEV (requires sudo)..."
+    sudo chmod 666 "$TARGET_DEV"
+    for part in $(lsblk -nr -o NAME "$TARGET_DEV" 2>/dev/null || true); do
+        sudo chmod 666 "/dev/$part" 2>/dev/null || true
+    done
 fi
+
+if [ ! -r "$TARGET_DEV" ] || [ ! -w "$TARGET_DEV" ]; then
+    echo "❌ Error: Insufficient permissions to read/write $TARGET_DEV."
+    echo "   Please grant permissions manually:"
+    echo "     sudo chmod 666 $TARGET_DEV"
+    exit 1
+fi
+echo "✓ Read/write access to $TARGET_DEV confirmed."
+echo ""
 
 # Step 3: Create Raw Disk VMDK Pointer
 echo "[Step 3/4] Generating VirtualBox raw disk VMDK descriptor..."
@@ -88,24 +99,38 @@ VM_DIR="$HOME/VirtualBox VMs/$VM_NAME"
 mkdir -p "$VM_DIR"
 VMDK_PATH="$VM_DIR/huronos-usb-raw.vmdk"
 
+# If VM is currently running, stop it first
+if VBoxManage showvminfo "$VM_NAME" --machinereadable 2>/dev/null | grep -q 'VMState="running"'; then
+    echo "Stopping existing running VM: $VM_NAME..."
+    VBoxManage controlvm "$VM_NAME" poweroff 2>/dev/null || true
+    sleep 1
+fi
+
 # If VM exists and holds a lock on the old VMDK, detach it first
-if VBoxManage list vms | grep -q "\"$VM_NAME\""; then
+if VBoxManage list vms 2>/dev/null | grep -q "\"$VM_NAME\""; then
     VBoxManage storageattach "$VM_NAME" --storagectl "SATA" --port 0 --device 0 --type hdd --medium none 2>/dev/null || true
     VBoxManage storageattach "$VM_NAME" --storagectl "IDE" --port 0 --device 0 --type hdd --medium none 2>/dev/null || true
 fi
 
 # Remove medium registry if previously registered
-VBoxManage closemedium disk "$VMDK_PATH" --delete 2>/dev/null || rm -f "$VMDK_PATH"
+OLD_UUID=$(VBoxManage list hdds 2>/dev/null | grep -B 1 "$VMDK_PATH" | grep -oP 'UUID:\s+\K[0-9a-f-]+' | head -n 1 || true)
+if [ -n "$OLD_UUID" ]; then
+    VBoxManage closemedium disk "$OLD_UUID" --delete 2>/dev/null || true
+fi
+VBoxManage closemedium disk "$VMDK_PATH" --delete 2>/dev/null || true
+rm -f "$VMDK_PATH"
 
 # Generate raw VMDK pointing to the physical USB
-VBoxManage internalcommands createrawvmdk -filename "$VMDK_PATH" -rawdisk "$TARGET_DEV"
+if ! VBoxManage createmedium disk --filename "$VMDK_PATH" --variant=RawDisk --format=VMDK --property RawDrive="$TARGET_DEV" 2>/dev/null; then
+    VBoxManage internalcommands createrawvmdk -filename "$VMDK_PATH" -rawdisk "$TARGET_DEV"
+fi
 echo "✓ Raw VMDK created: $VMDK_PATH -> $TARGET_DEV"
 echo ""
 
 # Step 4: Configure & Launch VirtualBox VM
 echo "[Step 4/4] Configuring VirtualBox VM ($VM_NAME)..."
 
-if ! VBoxManage list vms | grep -q "\"$VM_NAME\""; then
+if ! VBoxManage list vms 2>/dev/null | grep -q "\"$VM_NAME\""; then
     VBOX_FILE="$VM_DIR/$VM_NAME.vbox"
     if [ -f "$VBOX_FILE" ]; then
         echo "Registering existing VirtualBox machine: $VM_NAME..."
@@ -134,13 +159,13 @@ VBoxManage modifyvm "$VM_NAME" \
     --rtcuseutc on
 
 # Remove old IDE controller if present
-if VBoxManage showvminfo "$VM_NAME" --machinereadable | grep -q 'storagecontrollername.*="IDE"'; then
+if VBoxManage showvminfo "$VM_NAME" --machinereadable 2>/dev/null | grep -q 'storagecontrollername.*="IDE"'; then
     VBoxManage storageattach "$VM_NAME" --storagectl "IDE" --port 0 --device 0 --type hdd --medium none 2>/dev/null || true
     VBoxManage storagectl "$VM_NAME" --name "IDE" --remove 2>/dev/null || true
 fi
 
 # Setup SATA storage controller
-if ! VBoxManage showvminfo "$VM_NAME" --machinereadable | grep -q 'storagecontrollername.*="SATA"'; then
+if ! VBoxManage showvminfo "$VM_NAME" --machinereadable 2>/dev/null | grep -q 'storagecontrollername.*="SATA"'; then
     VBoxManage storagectl "$VM_NAME" --name "SATA" --add sata --controller IntelAhci --bootable on
 fi
 
