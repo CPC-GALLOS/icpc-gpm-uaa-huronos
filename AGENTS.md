@@ -203,6 +203,16 @@ Key settings:
 
 ---
 
+## Bulk-Cloning USBs from a Golden Master
+
+- **Script:** `09-clone-huronos-usb.sh /dev/sdX [/dev/sdY ...]` (source device first, then one or more targets; omit targets to auto-detect every other removable USB).
+- **Purpose:** After fully installing and customizing one USB via `01-install-huronos.sh` (Steps 1–3), clone it onto additional **identical-capacity** USBs far faster than re-running the interactive installer on each one.
+- **Method:** Only the ~6 GiB system partition (label `HURONOS`) is cloned byte-for-byte (staged in RAM under `/dev/shm` when there's room) — it holds 100% of the real content (base/software squashfs layers, the custom layer, NVIDIA boot tweaks). The two ext4 persistence partitions (`event-data`, `contest-data`) start empty on every install anyway, so they're freshly `mkfs.ext4`'d per target instead of being copied, giving each clone unique filesystem UUIDs there. Those new UUIDs are rebaked into `boot/huronos.cfg` (`event.uuid=`/`contest.uuid=` lines) the same way the ISO's own `install.sh` bakes UUIDs at its "[11/13]" step, and the `checksums` line for `boot/huronos.cfg` is recomputed the same way `03-configure-nvidia-boot.sh` does after its own edits. All targets in a run are cloned in parallel as background jobs.
+- **Note:** The FAT32 system partition's own volume UUID is preserved identical across all clones (it travels with the byte-cloned partition), which is safe as long as clones aren't mounted on the same host simultaneously — only the two persistence-partition UUIDs are guaranteed unique per clone.
+- **Verification:** Always boot-test a freshly cloned target with `08-test-huronos-usb-vbox.sh /dev/sdX` (or `06-test-huronos-usb-vm.sh`) before using it on real contest hardware.
+
+---
+
 ## Custom Wallpaper Integration
 
 - **Working template:** `huronos-wallpaper.png` (1920×1080 PNG).
@@ -277,7 +287,7 @@ huronOS uses **ConnMan** (`cmst`) for networking.
 > **Mandatory verification:** Any modified or newly created shell script (`*.sh`) in this repository **must always be verified with `shellcheck`**:
 >
 > ```bash
-> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh 07-test-huronos-vbox.sh 08-test-huronos-usb-vbox.sh
+> shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh 07-test-huronos-vbox.sh 08-test-huronos-usb-vbox.sh 09-clone-huronos-usb.sh
 > ```
 >
 > All scripts in this repo must pass `shellcheck` with zero errors and zero warnings before committing.

@@ -23,6 +23,7 @@ icpc-gpm-uaa-huronos/
 ├── 06-test-huronos-usb-vm.sh           # [VM - KVM USB] Direct physical USB boot in KVM / virt-viewer
 ├── 07-test-huronos-vbox.sh             # [VM - VBox Disk] Converts disk image to VDI and boots inside Oracle VirtualBox
 ├── 08-test-huronos-usb-vbox.sh         # [VM - VBox USB] Direct physical USB boot inside Oracle VirtualBox via raw VMDK
+├── 09-clone-huronos-usb.sh             # [Utility] Bulk-clones a finished "golden master" USB onto other identical-capacity USBs
 ├── competitive-programming-helper-*.vsix # Offline CPH extension package for VS Code
 ├── ms-python.python-*.vsix             # Offline Python extension package for VS Code
 ├── redhat.java-*.vsix                  # Offline Java language support package for VS Code
@@ -228,6 +229,24 @@ sudo bash 03-configure-nvidia-boot.sh /dev/sdX1
   VBoxManage controlvm "huronOS-USB-VirtualBox-VM" acpipowerbutton
   ```
 
+#### Step 6: Bulk-Cloning Additional USBs (Golden Master)
+
+Once a first USB has been fully installed and customized (Steps 1–4) and verified in a VM (Step 5), preparing an entire lab of identical-model USBs from it is much faster than repeating Steps 1–4 on every drive: `01-install-huronos.sh`'s `install.sh` partitions, formats, `cp -rf`s ~5.34 GB of files, verifies checksums, and installs the bootloader on every run — `09-clone-huronos-usb.sh` instead stages the finished ~6 GiB system partition once (in RAM when available) and writes it directly onto each target's system partition, only freshly formatting the two empty persistence partitions (`event-data`, `contest-data`) per target so each clone still gets unique filesystem UUIDs.
+
+```bash
+# Clone the golden master at /dev/sdb onto /dev/sdc and /dev/sdd:
+bash 09-clone-huronos-usb.sh /dev/sdb /dev/sdc /dev/sdd
+
+# Or omit targets to auto-detect every other removable USB currently plugged in:
+bash 09-clone-huronos-usb.sh /dev/sdb
+```
+
+Targets must be the same capacity as the source (or larger) and are fully erased. Always boot-test a clone before contest day, the same way as a fresh install:
+
+```bash
+bash 08-test-huronos-usb-vbox.sh /dev/sdc   # or 06-test-huronos-usb-vm.sh for KVM
+```
+
 ---
 
 ## Visual Studio Code Offline Extensions (C/C++, CPH, Python & Java)
@@ -344,6 +363,6 @@ If Wi-Fi connection to `RIUAA` or `eduroam` is strictly necessary, create a serv
 In accordance with repository guidelines, all shell scripts are verified with `shellcheck`:
 
 ```bash
-shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh 07-test-huronos-vbox.sh
+shellcheck 01-install-huronos.sh 02-inject-custom-layer.sh 02b-inject-vscode-extensions.sh 03-configure-nvidia-boot.sh 04-update-directives-wallpaper.sh 05-test-huronos-vm.sh 06-test-huronos-usb-vm.sh 07-test-huronos-vbox.sh 08-test-huronos-usb-vbox.sh 09-clone-huronos-usb.sh
 ```
 *Quality guarantee: 0 errors and 0 warnings.*
