@@ -14,6 +14,7 @@ Scripts are organized and numbered chronologically according to execution workfl
 
 ```text
 icpc-gpm-uaa-huronos/
+├── 00-setup-windows-wsl.ps1             # [Windows Prerequisite] Bootstraps WSL2 + usbipd-win, attaches USB, runs Step 1 inside WSL
 ├── 01-install-huronos.sh               # [Step 1] Base USB installer (automatically chains steps 2 and 3)
 ├── 02-inject-custom-layer.sh           # [Step 2] Injects 05-custom.hsl (Wallpaper, fbdev driver, Mesa, SPICE & extensions)
 ├── 02b-inject-vscode-extensions.sh     # [Helper] Standalone VS Code extension injector (CPH, C++, Python, Java)
@@ -177,6 +178,17 @@ Run `bash 01-install-huronos.sh --help` for the full flag reference (including t
 > [!WARNING]
 > **Never run two `01-install-huronos.sh` invocations at the same time** (e.g. in two terminals, to prep two USBs at once). The script mounts the ISO at a fixed, shared path (`/media/iso`) and globally masks/unmasks the `udisks2` automounter (`sudo systemctl mask/unmask udisks2`) for the whole system — two concurrent runs will fight over that mount point, and whichever finishes first unmounts the ISO and re-enables `udisks2` out from under the other one still installing. To prep multiple USBs, run `01-install-huronos.sh` **once** to build a single "golden master" USB, then use `09-clone-huronos-usb.sh` for the rest — that script *is* built for concurrency (see "Step 6: Bulk-Cloning Additional USBs" below): it clones every target in parallel as background jobs, with no shared mount point or system-wide state to race on.
 
+#### Installing from Windows (WSL2)
+
+huronOS's installer assumes a Linux host. On Windows, `00-setup-windows-wsl.ps1` bootstraps WSL2 and [`usbipd-win`](https://github.com/dorssel/usbipd-win), attaches the physical target USB into WSL2 over USB/IP, then runs `01-install-huronos.sh` inside WSL with the same flags in PascalCase:
+
+```powershell
+.\00-setup-windows-wsl.ps1 -Device /dev/sdb -Config icpc-gpm-2026-3rd-date.hdf -Password cpcgallos -Url https://raw.githubusercontent.com/CPC-GALLOS/icpc-gpm-uaa-huronos/main/icpc-gpm-2026-3rd-date.hdf -Yes
+```
+
+> [!WARNING]
+> The concurrency warning above applies **across hosts, not just across terminals**: a WSL2 run and a native Linux run share the same risk if pointed at the installer at the same time (both ultimately race on `/media/iso` and the `udisks2` mask inside their respective Linux environments). Never run `00-setup-windows-wsl.ps1` and `01-install-huronos.sh` concurrently either.
+
 ---
 
 ### Option B: Manual Execution & Modular Customization
@@ -285,6 +297,9 @@ Targets must be the same capacity as the source (or larger) and are fully erased
 bash 08-test-huronos-usb-vbox.sh /dev/sdc   # or 06-test-huronos-usb-vm.sh for KVM
 ```
 
+> [!NOTE]
+> `08-test-huronos-usb-vbox.sh` maps the raw USB block device into VirtualBox, which needs interactive `sudo` for raw device access and will unmount any host-mounted partitions of that device first — expect a password prompt. It also cleans up stale VM/medium UUID registrations left behind by a previous run against the same device, so re-running it repeatedly against the same USB is safe.
+
 ---
 
 ## Visual Studio Code Offline Extensions (C/C++, CPH, Python & Java)
@@ -371,6 +386,24 @@ To solve missing Unicode symbol and emoji tofu boxes (`[]`) across MOJ contestan
 - **DejaVu Sans (`DejaVuSans*.ttf`, incl. `DejaVuSansMono.ttf`):** Injected into `/usr/share/fonts/truetype/dejavu/` for complete Unicode symbol/typographic coverage and as the monospace fallback for MOJ's code/statement blocks (`--mono: "JetBrains Mono","Fira Mono","DejaVu Sans Mono",...`).
 - **Inter (`Inter-*.otf`):** Injected into `/usr/share/fonts/opentype/inter/` so MOJ's `font-family:"Inter"` UI text resolves to the actual typeface instead of silently falling back to `Segoe UI`/`Roboto` — MOJ ships no `@font-face`/webfont of its own for it.
 - **Fontconfig Configuration:** Configured in `/etc/fonts/conf.d/56-fonts-noto-color-emoji.conf` ensuring Chromium, Firefox, and system UI components resolve emoji codepoints immediately. Inter needs no alias — its OTF's internal family name already matches.
+
+---
+
+## Language Documentation & Default Application Associations
+
+huronOS includes built-in offline language documentation accessible from the application launcher:
+- **C++ Documentation:** `/usr/share/doc/reference/c++/en/cpp.html` (from `langs/g++`)
+- **C Documentation:** `/usr/share/doc/reference/c/en/c.html` (from `langs/gcc`)
+- **Java API Documentation:** `/usr/share/doc/reference/java/docs/api/index.html` (from `langs/javac`)
+- **Python 3 Documentation:** `/usr/share/doc/reference/python3/index.html` (from `langs/python3`)
+- **Ruby Documentation:** `/usr/share/doc/reference/ruby/index.html` (from `langs/ruby`)
+- **Kotlin Reference Guide:** `/usr/share/doc/reference/kotlinc/kotlin-reference.pdf` (from `langs/kotlinc`)
+
+To prevent text editors (like Atom or Geany) from intercepting HTML documentation files:
+- FreeDesktop `/etc/xdg/mimeapps.list`, `/usr/share/applications/mimeapps.list`, and `/home/contestant/.config/mimeapps.list` explicitly assign `chromium.desktop` as the primary default handler for `text/html`, `application/xhtml+xml`, `application/xml`, `x-scheme-handler/http`, and `x-scheme-handler/https` (with `firefox.desktop` as fallback).
+- `application/pdf` is explicitly routed to Okular (`okular.desktop`).
+- `x-scheme-handler/tg` is routed to Telegram Desktop (`org.telegram.desktop.desktop`).
+- Source code files (`.cpp`, `.c`, `.py`, `.java`, `.kt`, `.rb`, `.js`) prioritize full-featured IDEs/editors (`codium.desktop`, `geany.desktop`, `codeblocks.desktop`).
 
 ---
 

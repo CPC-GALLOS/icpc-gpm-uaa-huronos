@@ -39,6 +39,33 @@ The `extlinux` bootloader in huronOS alpha 0.4 has a **critical sync bug** (comm
 
 ---
 
+## Known Bug: install.sh has no non-interactive mode
+
+huronOS alpha 0.4's own `install.sh` was written for a single interactive operator and has **no CLI flags of its own**:
+
+- Every choice (target disk, confirmation, root password, directives URL, sync-server IP) is gathered via `read -r -p` prompts with no `--unattended`/`--yes` equivalent.
+- Its own argument parser **unconditionally resets `NEW_PASSWORD=""`** before it ever inspects the environment, so `export NEW_PASSWORD=...` from a wrapper script is silently clobbered — environment overrides don't work.
+- The sync-server-IP prompt is guarded by `[ -z "$DIRECTIVES_SERVER_IP" ]`, so there's no value that can be pre-set to make it skip itself when a blank/DHCP answer is intended — the `read` has to be removed outright.
+
+**Workaround (already in `01-install-huronos.sh`):** the wrapper copies `install.sh` out of the mounted ISO to a per-run temp file and combines three techniques before executing the patched copy:
+1. `sed -i` hardcodes the disk-selection and confirmation prompts (`SELECTION=0`, `CONFIRM=Y`) when `--device`/`--target` is given, and rewrites the hotplug-detection `if` to match the exact target device path instead of the first detected disk.
+2. The sync-server-IP `read` line is patched to a no-op (`: # non-interactive: ...`) in non-interactive mode, since there's no substitute value that would make it self-skip.
+3. `--root-password`, `--directives-url`, and `--directives-server-ip` are passed as real CLI flags to the patched script (`INSTALL_ARGS`), not just exported as environment variables, since only explicit flags survive `install.sh`'s own arg parser.
+
+This is why `01-install-huronos.sh` exposes `-d/--device`, `-p/--password`, `-u/--url`, `-s/--server-ip`, `-w/--wallpaper`, and `-y/--yes/--non-interactive` — see README.md § "Non-Interactive / Scripted Installation" for the user-facing flag reference.
+
+---
+
+## Windows/WSL2 Installation (`00-setup-windows-wsl.ps1`)
+
+huronOS's own installer assumes a Linux host, so Windows users need a bridging step: `00-setup-windows-wsl.ps1` bootstraps WSL2 and [`usbipd-win`](https://github.com/dorssel/usbipd-win), attaches the physical target USB into the WSL2 Linux environment over USB/IP, then invokes `01-install-huronos.sh` inside WSL with the same flags (PascalCase on the PowerShell side, e.g. `-Device`, `-Password`, `-Url`).
+
+**Known Bug — installer concurrency race:** `01-install-huronos.sh` mounts the ISO at a single fixed, shared path (`/media/iso`) and globally masks/unmasks the system-wide `udisks2` automounter (`sudo systemctl mask/unmask udisks2`) for the duration of the run. Neither of these is scoped per-invocation, so **two concurrent installer runs race and corrupt each other's state** — whichever finishes first unmounts the ISO and unmasks `udisks2` out from under the other, regardless of whether the two runs are both native Linux, both WSL2, or one of each. There is no locking around either resource.
+
+**Workaround:** never run two `01-install-huronos.sh` (or `00-setup-windows-wsl.ps1`) invocations at the same time, from any combination of hosts. Build one "golden master" USB serially, then use `09-clone-huronos-usb.sh` to fan out to the rest — that script clones every target in parallel as background jobs with no shared mount point or system-wide state to race on (see "Bulk-Cloning USBs from a Golden Master" below).
+
+---
+
 ## Directives System
 
 huronOS is controlled by a **directives file** — a plain-text INI-like file hosted on an HTTP/HTTPS server. The system polls this file to configure itself.
@@ -210,6 +237,12 @@ Key settings:
    - `fonts-inter` (`Inter-*.otf` static weights, `InterDisplay-*` excluded as unused) injected into `/usr/share/fonts/opentype/inter/`.
    - MOJ's stylesheet (`ui.css`) declares `font-family:"Inter",system-ui,...,sans-serif` with no `@font-face`/CDN of its own — without this package Chromium/Firefox silently fell back to `Segoe UI`/`Roboto`. No fontconfig alias is needed: the OTF's internal family name is already `Inter`, so fontconfig matches it directly once the files are present.
 
+4. **FreeDesktop / XDG MIME Associations & Language Documentation Viewer**:
+   - In huronOS base, documentation `.desktop` files (C++, C, Java, Python 3, Ruby) execute `open /usr/share/doc/reference/...` (`xdg-open` / `gio open`), which queries the default application for `text/html`.
+   - Base huronOS hardcoded `firefox.desktop` in `/etc/xdg/mimeapps.list`. When Firefox is not loaded (such as in `[Event]` mode or Chromium-only setups) or when `05-custom.hsl` was previously missing the full base list, GIO fell back alphabetically to `atom.desktop` (from `atom.hsm`) because Atom registers `text/html` in its `MimeType` field.
+   - **Fix (`02-inject-custom-layer.sh`):** Injects a complete FreeDesktop MIME mapping into `/etc/xdg/mimeapps.list`, `/usr/share/applications/mimeapps.list`, and `/home/contestant/.config/mimeapps.list` prioritizing `chromium.desktop` for `text/html`, `application/xhtml+xml`, `application/xml`, `x-scheme-handler/http`, and `x-scheme-handler/https` (with `firefox.desktop` as fallback), `okular.desktop` for `application/pdf` (Kotlin doc), `org.telegram.desktop.desktop` for `x-scheme-handler/tg`, and main IDEs (`codium.desktop`, `geany.desktop`, `codeblocks.desktop`) for code/text files.
+
+
 
 ---
 
@@ -231,6 +264,18 @@ Key settings:
    - **Physical USB Drive:** `08-test-huronos-usb-vbox.sh` (e.g. `bash 08-test-huronos-usb-vbox.sh /dev/sdb`) creates a raw disk VMDK descriptor directly mapped to the physical USB and boots `huronOS-USB-VirtualBox-VM`.
  - **Custom Disk Storage (`VM_DISK_DIR` / `VM_DISK_PATH`):**
    - Both `05-test-huronos-vm.sh` and `07-test-huronos-vbox.sh` support `export VM_DISK_DIR="/path/to/secondary/disk"` to store `.img` and `.vdi` files on alternative drives/partitions.
+
+---
+
+## Known Bug: VirtualBox raw USB device permissions
+
+Booting a physical USB directly inside VirtualBox (`08-test-huronos-usb-vbox.sh`) maps the raw block device into a VMDK descriptor, which surfaces several host-permission and stale-state issues not present in the KVM/`virt-viewer` path:
+
+- Raw block device access requires interactive `sudo` (VirtualBox's `VBoxManage createmedium`/`internalcommands createrawvmdk` needs read/write on `/dev/sdX` itself, not just a mounted partition).
+- Any host-side mount of the USB's own partitions must be unmounted first, or VirtualBox refuses to attach the raw device.
+- Re-running the script against the same device without cleanup can hit stale VM/medium UUID registrations left behind by a previous run.
+
+**Fix (commit `9cac119`, in `08-test-huronos-usb-vbox.sh`):** prompts for `sudo` up front for raw device access, unmounts any host-mounted partitions of the target device before mapping, de-registers stale VM and medium UUIDs from prior runs, and uses VirtualBox 7's `createmedium` API with a `createrawvmdk` fallback for older VirtualBox installs.
 
 ---
 
@@ -261,6 +306,10 @@ Key settings:
 ## VS Code Extensions Integration (C/C++, CPH, Python & Red Hat Java via Offline VSIX)
 
 huronOS alpha 0.4 ships with **VSCodium 1.81.1** (August 2023). In contest environments with strict firewalls and older VS Code runtimes, downloading extensions directly from the GUI marketplace fails with download errors. Therefore, all extensions are packaged as **100% offline `.vsix` packages** and pre-injected into the system:
+
+**Related fixes:**
+- **Commit `d628705`** ("fix(vscode): support offline VSIX extensions and resolve marketplace download errors"): VSCodium's marketplace client is intolerant of mixed-case extension IDs when resolving an offline `.vsix` against its local registry — the installer now lowercase-normalizes extension IDs before registration so offline installs resolve reliably instead of silently failing to register.
+- **Commit `4c99a54`** ("fix(codium): preserve writable extension registry in dynamic HSM modules"): the extension registry (`extensions.json` under `/opt/codium/contestant/extensions/`) must stay writable by the `contestant` user across the dynamic HSM module injection path (`02-inject-custom-layer.sh` / `02b-inject-vscode-extensions.sh`), since Codium rebuilds it at every startup — hence the `777` permissions noted in point 6 below.
 
 1. **`ms-vscode.cpptools` (C/C++ Tools)**:
    - Pre-packaged in base ISO as `huronOS/software/programming/vsc-cpptools.hsm` (v1.16.3) and pre-extracted into `05-custom.hsl`.

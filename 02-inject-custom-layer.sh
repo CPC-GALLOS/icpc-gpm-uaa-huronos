@@ -491,19 +491,11 @@ EOF
         cp -f "$TMP_LAB/squashfs-root/usr/share/applications/org.telegram.desktop.desktop" \
             "$TMP_LAB/squashfs-root/usr/share/applications/telegramdesktop.desktop"
 
-        # Register URL scheme handler for tg:// and t.me deep links
+        # Register URL scheme handler for tg:// and t.me deep links in mimeinfo.cache
         touch "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"
         if ! grep -q "x-scheme-handler/tg=" "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"; then
             echo "x-scheme-handler/tg=org.telegram.desktop.desktop;telegramdesktop.desktop;" >> "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"
         fi
-
-        cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/xdg/mimeapps.list"
-[Default Applications]
-x-scheme-handler/tg=org.telegram.desktop.desktop
-
-[Added Associations]
-x-scheme-handler/tg=org.telegram.desktop.desktop;
-EOF
 
         # Keep offline copy in /opt/telegram and /home/contestant/
         cp -f "$LOCAL_TG_TAR" "$TMP_LAB/squashfs-root/opt/telegram/tsetup.tar.xz"
@@ -806,10 +798,105 @@ else
     done
 fi
 
+# =============================================================================
+# FreeDesktop / XDG MIME Associations & Default Applications
+# Guarantees Chromium is primary handler for HTML, documentation & URLs,
+# Okular for PDF documentation, Telegram for tg:// protocol, and sets IDE priority.
+# =============================================================================
+echo "Configuring FreeDesktop / XDG default MIME associations..."
+mkdir -p "$TMP_LAB/squashfs-root/etc/xdg"
+mkdir -p "$TMP_LAB/squashfs-root/usr/share/applications"
+mkdir -p "$TMP_LAB/squashfs-root/home/contestant/.config"
+
+cat << 'EOF' > "$TMP_LAB/squashfs-root/etc/xdg/mimeapps.list"
+[Default Applications]
+text/html=chromium.desktop;firefox.desktop;
+application/xhtml+xml=chromium.desktop;firefox.desktop;
+application/xhtml_xml=chromium.desktop;firefox.desktop;
+text/xml=chromium.desktop;firefox.desktop;
+application/xml=chromium.desktop;firefox.desktop;
+x-scheme-handler/http=chromium.desktop;firefox.desktop;
+x-scheme-handler/https=chromium.desktop;firefox.desktop;
+x-scheme-handler/tg=org.telegram.desktop.desktop;telegramdesktop.desktop;
+application/pdf=okular.desktop;chromium.desktop;firefox.desktop;
+text/plain=codium.desktop;vscode.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-bash=codium.desktop;vscode.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-csrc=codium.desktop;vscode.desktop;codeblocks.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;clion.desktop;vim.desktop;nano.desktop;
+text/x-c++src=codium.desktop;vscode.desktop;codeblocks.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;clion.desktop;vim.desktop;nano.desktop;
+text/x-python=codium.desktop;vscode.desktop;pycharm.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-java=codium.desktop;vscode.desktop;intellij.desktop;eclipse.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-kotlin=codium.desktop;vscode.desktop;intellij.desktop;eclipse.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-ruby=codium.desktop;vscode.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/javascript=codium.desktop;vscode.desktop;geany.desktop;gedit.desktop;kate.desktop;sublime.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/calendar=org.gnome.Calendar.desktop;
+image/bmp=eog.desktop;
+image/gif=eog.desktop;
+image/jpeg=eog.desktop;
+image/jpg=eog.desktop;
+image/pjpeg=eog.desktop;
+image/png=eog.desktop;
+image/svg+xml=eog.desktop;
+image/svg+xml-compressed=eog.desktop;
+image/x-bmp=eog.desktop;
+image/x-gray=eog.desktop;
+image/x-icb=eog.desktop;
+image/x-ico=eog.desktop;
+image/x-pcx=eog.desktop;
+image/x-png=eog.desktop;
+image/x-portable-anymap=eog.desktop;
+image/x-portable-bitmap=eog.desktop;
+image/x-portable-graymap=eog.desktop;
+image/x-portable-pixmap=eog.desktop;
+image/x-xbitmap=eog.desktop;
+image/x-xpixmap=eog.desktop;
+
+[Added Associations]
+text/html=chromium.desktop;firefox.desktop;chrome.desktop;
+application/xhtml+xml=chromium.desktop;firefox.desktop;chrome.desktop;
+application/xhtml_xml=chromium.desktop;firefox.desktop;chrome.desktop;
+text/xml=chromium.desktop;firefox.desktop;chrome.desktop;
+application/xml=chromium.desktop;firefox.desktop;chrome.desktop;
+x-scheme-handler/http=chromium.desktop;firefox.desktop;chrome.desktop;
+x-scheme-handler/https=chromium.desktop;firefox.desktop;chrome.desktop;
+x-scheme-handler/tg=org.telegram.desktop.desktop;telegramdesktop.desktop;
+application/pdf=okular.desktop;chromium.desktop;firefox.desktop;chrome.desktop;
+text/plain=codium.desktop;vscode.desktop;sublime.desktop;kate.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/xml=codium.desktop;vscode.desktop;sublime.desktop;kate.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-bash=codium.desktop;vscode.desktop;sublime.desktop;kate.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;vim.desktop;nano.desktop;
+text/x-csrc=codium.desktop;vscode.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;clion.desktop;
+text/x-c++src=codium.desktop;vscode.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;clion.desktop;
+text/x-python=codium.desktop;vscode.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;pycharm.desktop;
+text/x-java=codium.desktop;vscode.desktop;intellij.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;eclipse.desktop;
+text/x-kotlin=codium.desktop;vscode.desktop;intellij.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;eclipse.desktop;
+text/x-ruby=codium.desktop;vscode.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;
+text/javascript=codium.desktop;vscode.desktop;vim.desktop;sublime.desktop;kate.desktop;codeblocks.desktop;gedit.desktop;geany.desktop;kdevelop.desktop;emacs.desktop;joe.desktop;atom.desktop;
+EOF
+
+# Copy to /usr/share/applications and contestant user config
+cp -f "$TMP_LAB/squashfs-root/etc/xdg/mimeapps.list" "$TMP_LAB/squashfs-root/usr/share/applications/mimeapps.list"
+cp -f "$TMP_LAB/squashfs-root/etc/xdg/mimeapps.list" "$TMP_LAB/squashfs-root/home/contestant/.config/mimeapps.list"
+chmod -R 777 "$TMP_LAB/squashfs-root/home/contestant/.config" 2>/dev/null || true
+
+# Pre-populate /usr/share/applications/mimeinfo.cache
+touch "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"
+for mime_entry in \
+    "text/html=chromium.desktop;firefox.desktop;" \
+    "application/xhtml+xml=chromium.desktop;firefox.desktop;" \
+    "x-scheme-handler/http=chromium.desktop;firefox.desktop;" \
+    "x-scheme-handler/https=chromium.desktop;firefox.desktop;" \
+    "x-scheme-handler/tg=org.telegram.desktop.desktop;telegramdesktop.desktop;" \
+    "application/pdf=okular.desktop;chromium.desktop;firefox.desktop;"; do
+    mime_key="${mime_entry%%=*}"
+    if ! grep -q "^${mime_key}=" "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"; then
+        echo "$mime_entry" >> "$TMP_LAB/squashfs-root/usr/share/applications/mimeinfo.cache"
+    fi
+done
+
 # Ensure permissive access for contestant user
 chmod -R 777 "$TMP_LAB/squashfs-root/opt/codium/contestant/extensions" 2>/dev/null || true
 chmod -R 755 "$TMP_LAB/squashfs-root/opt/codium/vsix" 2>/dev/null || true
 chmod -R 777 "$TMP_LAB/squashfs-root/home/contestant/vsix" 2>/dev/null || true
+chmod -R 777 "$TMP_LAB/squashfs-root/home/contestant/.config" 2>/dev/null || true
 
 echo "Building updated 05-custom.hsl squashfs layer..."
 rm -f "$TMP_LAB/05-custom.hsl"
