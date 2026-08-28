@@ -10,7 +10,7 @@
 #   bash 01-install-huronos.sh /dev/sdb [directives.hdf] [root_password] [directives_url] [server_ip] [wallpaper.png]
 #
 #   # Named flags:
-#   bash 01-install-huronos.sh -d /dev/sdb -c icpc-gpm-2026-3rd-date.hdf -p toor -u "https://..." -y
+#   bash 01-install-huronos.sh -d /dev/sdb -c icpc-gpm-2026-3rd-date.hdf -p <password> -u "https://..." -y
 #
 #   # Interactive mode:
 #   bash 01-install-huronos.sh
@@ -26,7 +26,7 @@ MOUNT_POINT="/media/iso"
 # Default configuration values
 TARGET_DEVICE=""
 HDF_INPUT=""
-ROOT_PASSWORD="toor"
+ROOT_PASSWORD=""
 DIRECTIVES_URL=""
 SERVER_IP=""
 WALLPAPER_FILE=""
@@ -44,7 +44,7 @@ Usage:
 Options:
   -d, --device <dev>        Target block device (e.g. /dev/sdb)
   -c, --config, --hdf <file> Directives .hdf file (default: icpc-gpm-2026-3rd-date.hdf)
-  -p, --password <pass>     Root user password (default: toor)
+  -p, --password <pass>     Root user password (prompted if not provided)
   -u, --url <url>           Directives download URL (default: Raw GitHub repo URL)
   -s, --server-ip <ip>      Directives sync server IP (optional)
   -w, --wallpaper <img.png> Custom wallpaper image (default: huronos-wallpaper.png)
@@ -53,7 +53,7 @@ Options:
 
 Examples:
   bash 01-install-huronos.sh /dev/sdb
-  bash 01-install-huronos.sh -d /dev/sdb -c icpc-gpm-2026-3rd-date.hdf -p toor -y
+  bash 01-install-huronos.sh -d /dev/sdb -c icpc-gpm-2026-3rd-date.hdf -p <password> -y
 EOF
     exit 0
 }
@@ -182,6 +182,20 @@ if [ -z "$WALLPAPER_FILE" ] || [ ! -f "$WALLPAPER_FILE" ]; then
     fi
 fi
 
+# Resolve root password: prompt interactively if not provided via -p
+if [ -z "$ROOT_PASSWORD" ]; then
+    if [ "$NON_INTERACTIVE" = true ]; then
+        # Non-interactive fallback: use the huronOS factory default (documented in the ISO)
+        ROOT_PASSWORD="toor"
+        echo "⚠️  No --password provided; using the huronOS factory default."
+        echo "   Run with -p <password> to set a custom root password."
+    else
+        read -r -s -p "Root password for huronOS (leave blank for factory default): " ROOT_PASSWORD
+        echo ""
+        [ -z "$ROOT_PASSWORD" ] && ROOT_PASSWORD="toor"
+    fi
+fi
+
 echo "============================================="
 echo " huronOS Installer — CPC GALLOS / UAA"
 echo "============================================="
@@ -189,7 +203,7 @@ echo "ISO Image:        $ISO_PATH"
 [ -n "$TARGET_DEVICE" ] && echo "Target USB:       $TARGET_DEVICE"
 echo "Directives File:  ${HDF_FILE:-None selected} ($(basename "${HDF_FILE:-none}"))"
 echo "Directives URL:   ${DIRECTIVES_URL:-None}"
-echo "Root Password:    $ROOT_PASSWORD"
+echo "Root Password:    (set)"
 if [ -n "$SERVER_IP" ]; then
     echo "Sync Server IP:   $SERVER_IP"
 fi
@@ -354,7 +368,7 @@ echo "============================================="
 echo "Target Device:  ${TARGET_DEVICE:-Auto-detected USB}"
 echo "Directives:     ${HDF_FILE:-Default}"
 echo "Directives URL: $DIRECTIVES_URL"
-echo "Root Password:  $ROOT_PASSWORD"
+echo "Root Password:  (set)"
 echo "Emojis/Fonts:   Noto Color Emoji & DejaVu installed"
 echo "Telegram:       Installed & registered (active in Always & Event modes)"
 echo "Extensions:     CPH, C++, Python & Java installed"
